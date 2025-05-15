@@ -1,9 +1,23 @@
-FROM python:3.10-slim
+# Use an official Node.js runtime as a parent image
+FROM node:18-alpine
 
+# Set working directory
 WORKDIR /app
 
-COPY agents/pheromind_agent /app
+# Copy package files first to install dependencies
+COPY package*.json ./
 
-RUN pip install --no-cache-dir -r requirements.txt
+# Install production dependencies
+RUN npm install --production
 
-CMD ["python", "main.py", "agent_inputs/goal.md"]
+# Copy rest of the app
+COPY . .
+
+# Build the Next.js app
+RUN npm run build
+
+# Expose port
+EXPOSE 3000
+
+# Start the app
+CMD ["npm", "start"]
