@@ -33,6 +33,7 @@
     ]
   },
   "include": [
+    "src/types/cmdk.d.ts",
     "**/*.ts",
     "**/*.tsx",
     "next-env.d.ts",
