@@ -1,19 +1,19 @@
-# Use official Node.js image
-FROM node:18-slim
-
-# Set working directory
+FROM node:18-slim AS builder
 WORKDIR /app
 
-# Copy package files and install deps
-COPY package.json package-lock.json* ./
-RUN npm install
+# ← THESE lines go in the Dockerfile, not in your shell
+COPY package*.json ./
+RUN npm ci
 
-# Copy the rest of the app
 COPY . .
-
-# Build the app
 RUN npm run build
 
-# Expose port and start app
+FROM node:18-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/.next .next
+COPY --from=builder /app/public public
+COPY --from=builder /app/package*.json ./
+RUN npm ci --production
 EXPOSE 3000
-CMD ["npm", "start"]
+CMD ["npm","start"]
