@@ -1,0 +1,1 @@
+Clean, structure, and deploy the AI Girlfriend App from the `improved_ai_gf_app` folder using your multi-agent system. Fix Docker build issues, confirm DigitalOcean deploy works, and remove unnecessary folders. Output updates to `/ai_docs/setup_log.md`. Use retries if failures occur.
