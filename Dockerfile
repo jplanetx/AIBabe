@@ -1,23 +1,17 @@
-# Use Node.js as base image
-FROM node:18-alpine
+FROM node:18-slim
 
-# Set working directory inside container
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json* ./
+# Copy package files from subfolder
+COPY improved_ai_gf_app/package*.json ./
 
-# Install dependencies
 RUN npm install
 
-# Copy the rest of the app
-COPY . .
+# Copy rest of the app
+COPY improved_ai_gf_app .
 
-# Build the Next.js app
 RUN npm run build
 
-# Expose port for Next.js
 EXPOSE 3000
 
-# Start the app
-CMD ["npm", "start"]
+CMD ["npm", "run", "start"]
