@@ -58,6 +58,8 @@ export const SUBSCRIPTION_PLANS = {
   },
 };
 
+export const FREE_TIER_LIMIT = 15;
+
 export const PERSONALITY_TYPES = {
   SUPPORTIVE: {
     name: "Supportive Partner",

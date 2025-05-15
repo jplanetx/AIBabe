@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 // Import these icons at the top to fix the errors
-import { Brain, Leaf, Gamepad, Mountain, Smile, Flask, ChessKnight } from "lucide-react";
+import { Brain, Leaf, Gamepad, Mountain, Smile } from "lucide-react";
 
 // Sample character data
 const characterData = {
