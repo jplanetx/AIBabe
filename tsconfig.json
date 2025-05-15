@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-"forceConsistentCasingInFileNames": true,
     "target": "es5",
     "lib": [
       "dom",
@@ -18,25 +17,29 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
+    "forceConsistentCasingInFileNames": true,
+    "types": [
+      "node"
+    ], // ✅ Fix #1
     "paths": {
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ]
   },
   "include": [
-    "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".build/types/**/*.ts"
+    "next-env.d.ts",
+    ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next" // ✅ Fix #2: Don't include build output
   ]
 }
