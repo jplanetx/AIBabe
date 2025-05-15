@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { MessageCircle, Clock, Heart, CreditCard, Settings, LogOut } from "lucide-react";
+// Updated import line to include Check
+import { MessageCircle, Clock, Heart, CreditCard, Settings, LogOut, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
