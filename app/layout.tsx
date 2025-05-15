@@ -1,8 +1,29 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import Header from "../components/layout/Header";
+import Header from "../components/layout/header";
 import Footer from "../components/layout/Footer";
+
+import { Component, ReactNode, ErrorInfo } from "react";
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(_: any) {
+    return { hasError: true };
+  }
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return <h1>Something went wrong.</h1>;
+    }
+    return this.props.children;
+  }
+}
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,12 +46,14 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-grow">{children}</main>
-            <Footer />
-          </div>
-        </ThemeProvider>
+                   <ErrorBoundary>
+                     <div className="flex flex-col min-h-screen">
+                       <Header />
+                       <main className="flex-grow">{children}</main>
+                       <Footer />
+                     </div>
+                   </ErrorBoundary>
+                 </ThemeProvider>
       </body>
     </html>
   );
