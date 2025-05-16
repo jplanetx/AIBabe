@@ -1,5 +1,7 @@
 import "./globals.css";
-import { ReactNode } from 'react'
+import { ReactNode } from 'react';
+import Navbar from "@/components/navbar"; // Import the Navbar component
+import { ThemeProvider } from "@/components/theme-provider"; // Assuming you have a ThemeProvider
 
 export const metadata = {
   title: 'AI Girlfriend',
@@ -8,10 +10,19 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
-      <body className="bg-black text-white">
-        {/* By applying Tailwind’s “bg-black” and “text-white” classes, you’ll have a black background and white text on all pages. */}
-        {children}
+    <html lang="en" suppressHydrationWarning>
+      <body className="bg-white dark:bg-black text-black dark:text-white">
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Navbar />
+          <main className="pt-20"> {/* Add top padding for the fixed navbar */}
+            {children}
+          </main>
+        </ThemeProvider>
       </body>
     </html>
   )

@@ -60,11 +60,12 @@ const ChatMessage = ({
             className={cn(
               "px-4 py-3 rounded-lg",
               isUserMessage
-                ? "bg-pink-500 text-white rounded-tr-none"
-                : "bg-gray-100 dark:bg-gray-800 rounded-tl-none"
+                ? "bg-blue-500 text-white rounded-tr-none"
+                : "bg-pink-500 text-white rounded-tl-none"
             )}
           >
-            <p className="text-sm">{content}</p>
+            {/* Ensure text color is white for both user and companion */}
+            <p className="text-sm text-white">{content}</p>
           </div>
           <span
             className={cn(

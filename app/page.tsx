@@ -18,7 +18,7 @@ export default function Home() {
       name: "Supportive Partner",
       description: "Nurturing, empathetic, and attentive. Perfect for those seeking emotional connection without judgment.",
       icon: <Heart className="w-10 h-10 text-primary" />,
-      image: "https://thumbs.dreamstime.com/z/caring-empathetic-woman-comforting-upset-younger-sister-sitting-together-cozy-cafe-over-cup-coffee-empathetic-woman-286365101.jpg?w=768"
+      image: "https://thumbs.dreamstime.com/z/caring-empathetic-woman-comforting-upset-younger-sister-sitting-together-cozy-cafe-over-cup-coffee-empathetic-woman-286365101.jpg"
     },
     {
       name: "Playful Companion",
@@ -36,7 +36,7 @@ export default function Home() {
       name: "Admirer",
       description: "Admiring, appreciative, and affirming. Perfect for those seeking validation and recognition.",
       icon: <Users className="w-10 h-10 text-primary" />,
-      image: "https://thumbs.dreamstime.com/z/close-up-portrait-beautiful-natural-woman-smiling-white-teeth-looking-admiration-joy-camera-close-up-portrait-241876199.jpg?w=992"
+      image: "https://thumbs.dreamstime.com/z/close-up-portrait-beautiful-natural-woman-smiling-white-teeth-looking-admiration-joy-camera-close-up-portrait-241876199.jpg"
     },
     {
       name: "Growth Catalyst",
@@ -63,7 +63,7 @@ export default function Home() {
       name: "Robert J.",
       age: 41,
       text: "The personalization options are incredible. I was able to create a companion who shares my interests and challenges me intellectually.",
-      avatar: "https://media.istockphoto.com/id/155353642/photo/headshot-of-casual-man-in-his-40s.jpg?s=1024x1024&w=is&k=20&c=7e4-4IjqOmxifXs9v8A9ur-ZA3AU-pjo_lnglWtpLss="
+      avatar: "https://media.istockphoto.com/id/155353642/photo/headshot-of-casual-man-in-his-40s.jpg"
     }
   ];
 

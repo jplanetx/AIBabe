@@ -73,7 +73,7 @@ const ChatInput = ({
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            className="min-h-[60px] max-h-[150px] pr-12 resize-none"
+            className="min-h-[60px] max-h-[150px] pr-12 resize-none text-black dark:text-gray-300"
             disabled={isLoading || disabled}
           />
           <div className="absolute bottom-3 right-3 flex space-x-1">

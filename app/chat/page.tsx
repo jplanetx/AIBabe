@@ -66,7 +66,15 @@ function ChatPageContent() {
   const [messages, setMessages] = useState(MOCK_MESSAGES);
   const [isLoading, setIsLoading] = useState(false);
   const [messageCount, setMessageCount] = useState(15); // Mock message count
-  const [subscription, setSubscription] = useState("FREE"); // Mock subscription
+  // const [subscription, setSubscription] = useState("FREE"); // Mock subscription
+
+  // Simulate fetching user email and checking against a tester list
+  const TESTER_EMAILS = ["tester@example.com"]; // Add your tester emails here
+  const currentUserEmail = "tester@example.com"; // Replace with actual user email logic
+  
+  const [subscription, setSubscription] = useState(() => {
+    return TESTER_EMAILS.includes(currentUserEmail) ? "TESTER" : "FREE";
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 

@@ -41,10 +41,9 @@ const Navbar = () => {
   return (
     <motion.header
       className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
-        scrolled
-          ? "bg-white/80 dark:bg-gray-900/80 backdrop-blur-md shadow-sm"
-          : "bg-transparent"
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-white dark:bg-gray-900 shadow-sm",
+        // Always show a solid background for visibility
+        // Optionally, you can keep the scroll effect by toggling a border or shadow
       )}
       initial={{ y: -100 }}
       animate={{ y: 0 }}
@@ -56,7 +55,7 @@ const Navbar = () => {
             <Link href="/" className="flex items-center">
               <span className="sr-only">AI Girlfriend</span>
               <Heart className="h-8 w-8 text-pink-500" />
-              <span className="ml-2 text-xl font-bold bg-gradient-to-r from-pink-500 to-violet-500 bg-clip-text text-transparent">
+              <span className="ml-2 text-xl font-bold text-pink-500 dark:text-pink-400">
                 AI Girlfriend
               </span>
             </Link>
