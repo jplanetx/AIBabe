@@ -33,6 +33,7 @@
     ]
   },
   "include": [
+    "types\/cmdk.d.ts",
     "src/types/cmdk.d.ts",
     "**/*.ts",
     "**/*.tsx",
