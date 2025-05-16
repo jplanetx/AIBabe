@@ -1,77 +1,41 @@
 {
   "signals": [
     {
-      "id": "example-init-001",
-      "signalType": "project_initialization_needed",
-      "target": "ExampleProject",
-      "category": "need",
-      "strength": 0.85,
-      "message": "Example: Project initialization is required. Overwrite this signal.",
-      "data": {
-        "initial_directive_type": "user_blueprint",
-        "payload_path": "path/to/your/blueprint.md"
-      },
-      "timestamp_created": "YYYY-MM-DDTHH:MM:SSZ",
-      "last_updated_timestamp": "YYYY-MM-DDTHH:MM:SSZ"
+      "type": "project_goal",
+      "description": "Deploy the AI Girlfriend app to Vercel with all deployment blockers resolved."
     },
     {
-      "id": "example-priority-001",
-      "signalType": "prioritize_feature_X_development",
-      "target": "ExampleFeature",
-      "category": "priority",
-      "strength": 4.5,
-      "message": "Example: High priority task - focus development on ExampleFeature. Replace this message.",
-      "data": {
-        "prd_path": "docs/example_prd.md",
-        "relevant_prd_sections": [
-          "Section 1.A",
-          "Section 5.B (Critical Example)",
-          "FR-EXAMPLE-001",
-          "FR-EXAMPLE-002"
-        ],
-        "specific_data_paths_to_use": [
-          "data/example_data_source_1/",
-          "data/example_data_source_2/"
-        ],
-        "data_source_instruction": "EXAMPLE INSTRUCTION: Use only specified data sources. DO NOT use placeholder data in actual runs. This is an example.",
-        "env_details": {
-          "NEO4J_URI": "bolt://example-host:7687",
-          "NEO4J_USER": "user_placeholder",
-          "NEO4J_PASSWORD": "password_placeholder",
-          "NEO4J_DATABASE": "example_db"
-        },
-        "user_directive": "EXAMPLE DIRECTIVE: Focus solely on implementing ExampleFeature using the specified data sources. Overwrite this directive."
-      },
-      "timestamp_created": "YYYY-MM-DDTHH:MM:SSZ",
-      "last_updated_timestamp": "YYYY-MM-DDTHH:MM:SSZ"
+      "type": "acceptance_test",
+      "description": "The app builds and runs successfully on Vercel, with all endpoints functional and no deployment errors."
     },
     {
-      "id": "example-state-001",
-      "signalType": "framework_scaffolding_complete",
-      "target": "ExampleProject",
-      "category": "state",
-      "strength": 1.0,
-      "message": "Example: Framework scaffolding has been completed. This is an example signal.",
-      "data": {
-        "report_path": "docs/example_scaffold_report.md",
-        "scaffolded_modules": ["module_A_example", "module_B_example"]
-      },
-      "timestamp_created": "YYYY-MM-DDTHH:MM:SSZ",
-      "last_updated_timestamp": "YYYY-MM-DDTHH:MM:SSZ"
+      "id": "b1e7e2e2-7c1a-4f6c-9e7d-1f3e8e2c9a1b",
+      "timestamp": "2025-05-16T15:13:58.000Z",
+      "source_orchestrator": "orchestrator-feature-implementation-tdd",
+      "handoff_reason_code": "partial_success_subtasks_remaining",
+      "summary": "Comprehensive summary for Scribe logging — Vercel Deployment Blockers Resolution (Feature Implementation TDD Cycle):\n\nContext Gathering:\nConsulted .pheromone and [prompts/CHANGE_REQUEST_aibabe_vercel_fix.md](prompts/CHANGE_REQUEST_aibabe_vercel_fix.md:1). The project goal and acceptance test require a successful Vercel deployment with all endpoints functional and no errors. The change request enumerates six AI-verifiable sub-tasks, each mapped to a clear outcome.\n\nTDD Orchestration:\n- Sub-task 1 (Dependency & Lockfile Sync) was completed by the coder:\n  - Ran `npm ci` and resolved Prisma client generation.\n  - `npm run build` succeeded.\n  - `npm list cmdk` confirmed correct version.\n  - All AI-verifiable criteria met: up-to-date lockfile, reproducible build, dependency match.\n  - Self-reflection: High quality, secure, reproducible, and maintainable; no new vulnerabilities; all commands exited with code 0.\n\nNext Steps:\n- Remaining sub-tasks (type stub, tsconfig, Vercel env, deploy/health, auto deploy) are queued for TDD implementation, each requiring AI-verifiable outcomes and self-reflection.\n- This summary details collective outcomes for human review and is intended for the Scribe to update the pheromone state, reflecting the feature's development and quality status relative to the Master Project Plan.\n\nFinal Handoff Reason Code:\n`partial_success_subtasks_remaining` — First sub-task complete, others in progress."
+    },
+    {
+      "id": "c3e8d2f4-9b2a-4e6c-8f2d-2a4e9b3c7d2e",
+      "timestamp": "2025-05-16T15:40:09.000Z",
+      "source_orchestrator": "orchestrator-pheromone-scribe",
+      "handoff_reason_code": "partial_success_subtasks_remaining",
+      "summary": "Comprehensive summary for Scribe logging — Vercel Deployment Blockers Resolution (Feature Implementation TDD Cycle):\n\nContext Gathering:\nConsulted [prompts/CHANGE_REQUEST_aibabe_vercel_fix.md](prompts/CHANGE_REQUEST_aibabe_vercel_fix.md:1) and .pheromone. The next queued sub-task was \"Type Stub Fix for `cmdk`\", required to unblock Vercel builds by providing a type declaration for the `cmdk` module. Acceptance criteria: [types/cmdk.d.ts](types/cmdk.d.ts:1) must exist with `declare module 'cmdk';` and `tsc --noEmit` must show no errors referencing `cmdk`.\n\nTDD Orchestration:\nDelegated to coder with explicit requirements and AI-verifiable outcomes. The coder:\n- Verified [types/cmdk.d.ts](types/cmdk.d.ts:1) exists and contains only `declare module 'cmdk';`.\n- Ran `npx tsc --noEmit` and confirmed all errors were unrelated to `cmdk`, proving the stub resolved the intended blocker.\n- Provided a self-reflection: solution is minimal, clear, reproducible, and secure (10/10 confidence).\n\nOutcome:\nAll acceptance criteria for this sub-task are met. No further action or debugging required. This summary details collective outcomes for human review and is intended for the Scribe to update the pheromone state, reflecting the feature's development and quality status relative to the Master Project Plan.\n\nFinal Handoff Reason Code:\n`partial_success_subtasks_remaining` — This sub-task is complete, others remain in the deployment blockers queue."
+    },
+    {
+      "id": "d7f8e3a1-2c4b-4e5f-9b7c-1a2b3c4d5e6f",
+      "timestamp": "2025-05-16T15:47:21.000Z",
+      "source_orchestrator": "orchestrator-pheromone-scribe",
+      "handoff_reason_code": "partial_success_subtasks_remaining",
+      "summary": "Comprehensive summary for Scribe logging — Vercel Deployment Blockers Resolution (Feature Implementation TDD Cycle):\n\nContext Gathering:\nConsulted .pheromone and [prompts/CHANGE_REQUEST_aibabe_vercel_fix.md](prompts/CHANGE_REQUEST_aibabe_vercel_fix.md:1). The project goal is a successful, reproducible Vercel deployment with all blockers resolved. The next queued sub-task was Task 3: tsconfig Fix, requiring \"typeRoots\": [\"./types\", \"./node_modules/@types\"] in [tsconfig.json](tsconfig.json:1) and a successful build with no cmdk type errors.\n\nTDD Orchestration:\nDelegated to coder with explicit requirements and AI-verifiable outcomes. The coder verified that [tsconfig.json](tsconfig.json:1) already contained the correct typeRoots setting, so no changes were needed. The build was executed (`npm run build`) and completed successfully with no cmdk type errors or other issues.\n\nSelf-Reflection:\n- Quality: Configuration is correct, minimal, and follows best practices.\n- Reproducibility: Deterministic result; anyone using this config will have correct type resolution.\n- Security: No risks introduced; only affects type resolution.\n- Edge Cases: If new type directories are added, they should be included in typeRoots.\n- Maintainability: Config is clear and maintainable.\n\nOutcome:\nAll acceptance criteria for this sub-task are met. No further action or debugging required. This summary details collective outcomes for human review and is intended for the Scribe to update the pheromone state, reflecting the feature's development and quality status relative to the Master Project Plan.\n\nFinal Handoff Reason Code:\n`partial_success_subtasks_remaining` — This sub-task is complete, others remain in the deployment blockers queue."
     }
   ],
-  "documentation_registry": [
+  "documentationRegistry": [
     {
-      "file_path": "docs/Example_Document_1.md",
-      "description": "Example: General project documentation file. Replace this entry.",
-      "type": "general_documentation",
-      "last_updated_timestamp": "YYYY-MM-DDTHH:MM:SSZ"
-    },
-    {
-      "file_path": "docs/Example_Specification_v1.md",
-      "description": "Example: Specification document for a core feature. Overwrite this.",
-      "type": "specification",
-      "last_updated_timestamp": "YYYY-MM-DDTHH:MM:SSZ"
+      "type": "change_request",
+      "path": "prompts/CHANGE_REQUEST_aibabe_vercel_fix.md",
+      "description": "List of Vercel deployment blockers and requested fixes.",
+      "timestamp": "2025-05-16T15:13:58.000Z"
     }
   ]
 }

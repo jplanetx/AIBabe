@@ -22,6 +22,10 @@
       "jest",
       "node"
     ], // ✅ Fix #1
+    "typeRoots": [
+      "./types",
+      "./node_modules/@types"
+    ],
     "paths": {
       "@/*": [
         "./*"
