@@ -19,6 +19,7 @@
     "incremental": true,
     "forceConsistentCasingInFileNames": true,
     "types": [
+      "jest",
       "node"
     ], // ✅ Fix #1
     "paths": {

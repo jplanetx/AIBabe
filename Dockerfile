@@ -1,4 +1,4 @@
-FROM node:18-slim AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
 
 # ← THESE lines go in the Dockerfile, not in your shell
@@ -8,7 +8,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:18-slim AS runtime
+FROM node:20-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/.next .next
