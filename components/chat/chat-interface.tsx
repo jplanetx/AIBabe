@@ -24,9 +24,11 @@ const ChatInterface = ({ conversationId }: ChatInterfaceProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [messageCount, setMessageCount] = useState(8); // Mock data
-  const [subscription, setSubscription] = useState({ plan: "FREE" }); // Mock data
-  
+  const [messageCount, setMessageCount] = useState(8); // Will be updated by API
+  const [subscription, setSubscription] = useState({ plan: "FREE" }); // Mock data, API will drive limits
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [messageLimit, setMessageLimit] = useState(FREE_TIER_LIMIT); // Default, will be updated by API
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -71,54 +73,92 @@ const ChatInterface = ({ conversationId }: ChatInterfaceProps) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!newMessage.trim()) return;
-    
-    // Check if user has reached message limit
-    if (messageCount >= FREE_TIER_LIMIT && subscription.plan === "FREE") {
-      // Show upgrade message
-      return;
-    }
-    
+
+    // Optimistically add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       content: newMessage,
       isUserMessage: true,
       timestamp: new Date(),
     };
-    
     setMessages((prev) => [...prev, userMessage]);
+    const currentNewMessage = newMessage;
     setNewMessage("");
     setIsLoading(true);
-    setMessageCount((prev) => prev + 1);
-    
-    // Simulate AI response
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: getAIResponse(newMessage),
-        isUserMessage: false,
-        timestamp: new Date(),
-      };
-      
-      setMessages((prev) => [...prev, aiMessage]);
-      setIsLoading(false);
-    }, 1500);
-  };
+    setChatError(null); // Clear previous errors
 
-  // Simple mock AI response function
-  const getAIResponse = (userMessage: string): string => {
-    const responses = [
-      "I understand how you feel. Would you like to talk more about that?",
-      "That's really interesting! Tell me more about your thoughts on this.",
-      "I'm here for you. How can I support you with this?",
-      "I appreciate you sharing that with me. It means a lot that you trust me.",
-      "I'm curious about what happened next. Would you mind elaborating?",
-    ];
-    
-    return responses[Math.floor(Math.random() * responses.length)];
+    try {
+      const requestBody = {
+        userId: "mockUserId", // Mock user ID
+        personalityId: conversation.id,
+        message: currentNewMessage,
+      };
+      console.log("CHAT_UI_SENDING_REQUEST:", requestBody);
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log("CHAT_UI_RECEIVED_RESPONSE_SUCCESS:", data);
+        
+        setMessageCount(data.messageCount);
+        if (data.messageLimit) {
+          setMessageLimit(data.messageLimit);
+        }
+
+        if (data.limitReached) {
+          // The UI for limitReached is already handled by the component's main render logic
+          // based on messageCount and messageLimit. We just need to ensure these are set.
+          console.log("Message limit reached according to API.");
+        } else if (data.error_code) {
+          const errorMessage = data.message || "An API error occurred.";
+          console.log("CHAT_UI_DISPLAYING_ERROR (from data.error_code):", errorMessage);
+          setChatError(errorMessage);
+          // Optionally, remove the optimistically added user message if the API indicates a persistent error for it
+          // setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
+        } else if (data.aiMessage && data.aiMessage.text) {
+          const aiMessage: Message = {
+            id: data.aiMessage.id || (Date.now() + 1).toString(),
+            content: data.aiMessage.text,
+            isUserMessage: false,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, aiMessage]);
+          setChatError(null);
+        } else {
+          // Handle cases where AI message might be missing but no explicit error_code
+          const errorMessage = "Received an unexpected response from the server.";
+          console.log("CHAT_UI_DISPLAYING_ERROR (unexpected response):", errorMessage);
+          setChatError(errorMessage);
+        }
+      } else {
+        const errorData = await response.json();
+        console.log("CHAT_UI_RECEIVED_RESPONSE_ERROR_DATA:", errorData);
+        const errorMessage = errorData.message || "An error occurred while sending your message.";
+        console.log("CHAT_UI_DISPLAYING_ERROR (response not ok):", errorMessage);
+        setChatError(errorMessage);
+        // Optionally, remove the optimistically added user message
+        // setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
+      }
+    } catch (error) {
+      console.error("CHAT_UI_FETCH_ERROR_CAUGHT:", error);
+      const errorMessage = "Failed to send message. Please check your connection and try again.";
+      console.log("CHAT_UI_DISPLAYING_ERROR (fetch catch):", errorMessage);
+      setChatError(errorMessage);
+      // Optionally, remove the optimistically added user message
+      // setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const messageVariants = {
@@ -195,14 +235,14 @@ const ChatInterface = ({ conversationId }: ChatInterfaceProps) => {
 
       <div className="border-t bg-background p-4">
         <div className="container mx-auto max-w-4xl">
-          {messageCount >= FREE_TIER_LIMIT && subscription.plan === "FREE" ? (
+          {messageCount >= messageLimit && subscription.plan === "FREE" ? (
             <Card className="p-4 mb-4 bg-primary/5 border-primary/20">
               <div className="flex items-start">
                 <Heart className="h-5 w-5 text-primary mr-3 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
                   <h3 className="font-medium mb-1">Message limit reached</h3>
                   <p className="text-sm text-muted-foreground mb-3">
-                    You've used all {FREE_TIER_LIMIT} messages for today. Upgrade to continue chatting.
+                    You've used all {messageLimit} messages for today. Upgrade to continue chatting.
                   </p>
                   <Button asChild size="sm">
                     <Link href="/subscription">Upgrade Now</Link>
@@ -226,10 +266,18 @@ const ChatInterface = ({ conversationId }: ChatInterfaceProps) => {
             </form>
           )}
           
+          {chatError && (
+            <div className="mt-2 text-center text-red-500">
+              <p>Error: {chatError}</p>
+              <Button variant="outline" size="sm" onClick={() => setChatError(null)} className="mt-1">
+                Dismiss
+              </Button>
+            </div>
+          )}
           <div className="mt-2 text-xs text-muted-foreground text-center">
             {subscription.plan === "FREE" && (
               <span>
-                {FREE_TIER_LIMIT - messageCount} messages remaining today.{" "}
+                {Math.max(0, messageLimit - messageCount)} messages remaining today.{" "}
                 <Link href="/subscription" className="text-primary hover:underline">
                   Upgrade for more
                 </Link>

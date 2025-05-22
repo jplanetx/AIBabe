@@ -8,12 +8,12 @@ const prisma = new PrismaClient();
 export async function POST(req: NextRequest) {
   try {
     const { userId, personalityId, message } = await req.json();
+    console.log("API_CHAT_REQUEST_RECEIVED:", { userId, personalityId, message });
 
     if (!userId || !personalityId || !message) {
-      return NextResponse.json(
-        { error: "Missing required fields" },
-        { status: 400 }
-      );
+      const errorResponse = { error_code: "MISSING_FIELDS", message: "Missing required fields (userId, personalityId, message)." };
+      console.log("API_CHAT_SENDING_ERROR_RESPONSE (400):", errorResponse);
+      return NextResponse.json(errorResponse, { status: 400 });
     }
 
     // Check user's subscription and message limit
@@ -23,7 +23,9 @@ export async function POST(req: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      const errorResponse = { error_code: "USER_NOT_FOUND", message: "User not found." };
+      console.log("API_CHAT_SENDING_ERROR_RESPONSE (404):", errorResponse);
+      return NextResponse.json(errorResponse, { status: 404 });
     }
 
     // Get or create conversation
@@ -104,10 +106,9 @@ export async function POST(req: NextRequest) {
     });
 
     if (!personality) {
-      return NextResponse.json(
-        { error: "Personality not found" },
-        { status: 404 }
-      );
+      const errorResponse = { error_code: "PERSONALITY_NOT_FOUND", message: "Personality not found." };
+      console.log("API_CHAT_SENDING_ERROR_RESPONSE (404):", errorResponse);
+      return NextResponse.json(errorResponse, { status: 404 });
     }
 
     // Get random memory to reference (30% chance)
@@ -176,11 +177,18 @@ export async function POST(req: NextRequest) {
       messageCount: messageCount + 1,
       messageLimit,
     });
+    const successResponse = {
+      userMessage: userMessage,
+      aiMessage: aiMessageRecord,
+      messageCount: messageCount + 1,
+      messageLimit,
+    };
+    console.log("API_CHAT_SENDING_SUCCESS_RESPONSE:", successResponse);
+    return NextResponse.json(successResponse);
   } catch (error) {
-    console.error("Error in chat API:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    console.error("API_CHAT_ERROR_CAUGHT:", error);
+    const errorResponse = { error_code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred. Please try again later." };
+    console.log("API_CHAT_SENDING_ERROR_RESPONSE (500):", errorResponse);
+    return NextResponse.json(errorResponse, { status: 500 });
   }
 }
