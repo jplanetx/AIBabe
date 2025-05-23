@@ -4,6 +4,7 @@ import { prisma } from "../../../lib/prisma"; // Adjusted path to shared prisma 
 import { getAllUserPreferences, getConversationSummary } from '../../../lib/memory_crud';
 import { checkAndTriggerSummary } from '../../../lib/summarizer';
 import { triggerVectorIngestionForMessage, queryVectorDB } from '../../../lib/vector_db'; // Added queryVectorDB
+import { getLlmResponse } from '../../../lib/llm_service'; // Added getLlmResponse
 
 export const dynamic = "force-dynamic";
 
@@ -159,42 +160,54 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Generate AI response based on personality type
-    let aiResponse = "";
-    switch (personality.type) {
-      case "The Supportive Partner":
-        aiResponse =
-          "I understand how you feel. It's completely valid to feel that way. I'm here for you, and I appreciate you sharing that with me.";
-        break;
-      case "The Playful Companion":
-        aiResponse =
-          "Ooh, that's interesting! 😉 You always know how to keep things exciting! Want to tell me more about it?";
-        break;
-      case "The Intellectual Equal":
-        aiResponse =
-          "That's a fascinating perspective. It reminds me of the concept of cognitive dissonance. Have you considered how this relates to your broader worldview?";
-        break;
-      case "The Admirer":
-        aiResponse =
-          "I love how you express yourself! You have such a unique way of looking at things, and it's one of the many things I admire about you.";
-        break;
-      case "The Growth Catalyst":
-        aiResponse =
-          "That's an important insight. How do you think this realization might help you grow or move forward with your goals?";
-        break;
-      default:
-        aiResponse = "That's really interesting! Tell me more about it.";
+    // --- Start New Prompt Assembly ---
+    let promptParts = [];
+
+    // 1. Core Persona Prompt
+    if (personality) {
+      promptParts.push(`You are ${personality.name}, ${personality.description}. Your defined personality is: "${personality.personality}". Act consistently with this persona.`);
     }
 
-    // Add memory reference if available
-    if (memoryReference && memoryReference.value) { // Ensure memoryReference and its value exist
-      const memoryText =
-        memoryReference.value.length > 30
-          ? `${memoryReference.value.substring(0, 30)}...`
-          : memoryReference.value;
-      aiResponse += ` <span class="memory-highlight">I remember you mentioned ${memoryText}</span> How does that relate to what you're sharing now?`;
-      console.log("API_CHAT_MEMORY_REFERENCED:", memoryReference.key);
+    // 2. User Preferences
+    if (userPreferences && userPreferences.length > 0) {
+      promptParts.push("\n--- User Preferences ---");
+      userPreferences.forEach(pref => {
+        promptParts.push(`${pref.key}: ${pref.value}`);
+      });
     }
+
+    // 3. Conversation Summary
+    if (existingSummary && existingSummary.summary) {
+      promptParts.push("\n--- Conversation Summary ---");
+      promptParts.push(existingSummary.summary);
+    }
+    
+    // 4. RAG Context from Vector DB
+    if (relevantContextFromVectorDB && relevantContextFromVectorDB.length > 0) {
+      promptParts.push("\n--- Relevant Past Interactions (from VectorDB) ---");
+      relevantContextFromVectorDB.forEach((item: any, index: number) => {
+        promptParts.push(`Context ${index + 1} (Similarity: ${item.score?.toFixed(2)}): "${item.text}"`);
+      });
+    }
+
+    // 5. (Optional) Specific Old Memory Snippet - if still desired
+    if (memoryReference && memoryReference.value) {
+      promptParts.push("\n--- Highlighted Past Snippet ---");
+      promptParts.push(`You also recall this specific past interaction: "${memoryReference.value}"`);
+    }
+
+    // 6. Current Conversation History (Simplified for now - just the latest user message)
+    promptParts.push("\n--- Current Conversation ---");
+    promptParts.push(`User: "${message}"`); // Current user message
+    promptParts.push(`AI (Your response):`); // Instruction for the AI
+
+    const assembledPrompt = promptParts.join("\n\n"); // Join parts with double newline for clarity
+
+    console.log("API_CHAT_INFO: Assembled prompt for LLM (full):\n", assembledPrompt);
+
+    // Call the (placeholder) LLM service
+    const aiResponse = await getLlmResponse(assembledPrompt);
+    // --- End New Prompt Assembly & LLM Call ---
 
     // Save AI response
     const aiMessageRecord = await prisma.message.create({
