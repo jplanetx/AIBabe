@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+// PrismaClient is no longer directly instantiated here, using shared client from lib
+import { prisma } from "../../../lib/prisma"; // Adjusted path to shared prisma client
+import { getAllUserPreferences, getConversationSummary } from '../../../lib/memory_crud';
+import { checkAndTriggerSummary } from '../../../lib/summarizer';
+import { triggerVectorIngestionForMessage, queryVectorDB } from '../../../lib/vector_db'; // Added queryVectorDB
 
 export const dynamic = "force-dynamic";
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient(); // Replaced by shared client import
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,6 +49,23 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Load user preferences and existing summary
+    const userPreferences = await getAllUserPreferences(userId);
+    const existingSummary = await getConversationSummary(conversation.id);
+
+    console.log("API_CHAT_USER_PREFERENCES_LOADED:", userPreferences);
+    console.log("API_CHAT_EXISTING_SUMMARY_LOADED:", existingSummary);
+    // These are not used in the response logic yet, but loaded.
+
+    // Query Vector DB for relevant context
+    let relevantContextFromVectorDB: any[] = [];
+    if (message && userId && conversation && conversation.id) { // Ensure necessary IDs are available
+      console.log("API_CHAT_INFO: Querying Vector DB for relevant context...");
+      relevantContextFromVectorDB = await queryVectorDB(message, userId, 3); // Query with user's message
+      console.log("API_CHAT_INFO: Retrieved context from Vector DB:", relevantContextFromVectorDB);
+    }
+    // This 'relevantContextFromVectorDB' can be used later in prompt engineering (TASK 4)
+
     // Count today's messages
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -79,10 +100,17 @@ export async function POST(req: NextRequest) {
     const userMessage = await prisma.message.create({
       data: {
         conversationId: conversation.id,
-        sender: "user",
-        text: message,
+        isUserMessage: true, // Correct field and type
+        content: message,    // Correct field
       },
     });
+
+    // Trigger vector DB ingestion for user message
+    if (userMessage && userMessage.id) {
+      // Intentionally not awaiting, let it run in background
+      triggerVectorIngestionForMessage(userMessage.id)
+        .catch(err => console.error("API_CHAT_ERROR: Failed to trigger vector ingestion for user message:", err));
+    }
 
     // Check for potential memory in the message
     if (
@@ -90,14 +118,18 @@ export async function POST(req: NextRequest) {
       message.includes("I") ||
       message.length > 50
     ) {
-      await prisma.memory.create({
-        data: {
-          userId,
-          text: message,
-          source: userMessage.id,
-          importance: 3, // Medium importance by default
-        },
-      });
+      if (userMessage && userMessage.id && conversation && conversation.id) { // Ensure userMessage and conversation are defined
+        await prisma.memory.create({
+          data: {
+            key: userMessage.id, // Use message ID as the key for uniqueness
+            value: message,       // Store message content in 'value'
+            conversationId: conversation.id, // Link to the current conversation
+          },
+        });
+        console.log("API_CHAT_MEMORY_CREATED_WITH_KEY:", userMessage.id);
+      } else {
+        console.warn("API_CHAT_MEMORY_CREATION_SKIPPED: userMessage.id or conversation.id is undefined.");
+      }
     }
 
     // Get personality details
@@ -113,12 +145,13 @@ export async function POST(req: NextRequest) {
 
     // Get random memory to reference (30% chance)
     let memoryReference = null;
-    if (Math.random() > 0.7) {
+    if (Math.random() > 0.7 && conversation && conversation.id) { // Ensure conversation object is defined
       const memories = await prisma.memory.findMany({
-        where: { userId },
-        orderBy: { importance: "desc" },
+        where: { conversationId: conversation.id }, // Query by conversationId
+        orderBy: { createdAt: "desc" }, // Order by creation time (or any other relevant field like 'updatedAt')
         take: 5,
       });
+      console.log("API_CHAT_MEMORIES_FOUND:", memories.length > 0 ? memories : "No memories found for this conversation.");
 
       if (memories.length > 0) {
         memoryReference =
@@ -154,37 +187,50 @@ export async function POST(req: NextRequest) {
     }
 
     // Add memory reference if available
-    if (memoryReference) {
+    if (memoryReference && memoryReference.value) { // Ensure memoryReference and its value exist
       const memoryText =
-        memoryReference.text.length > 30
-          ? `${memoryReference.text.substring(0, 30)}...`
-          : memoryReference.text;
+        memoryReference.value.length > 30
+          ? `${memoryReference.value.substring(0, 30)}...`
+          : memoryReference.value;
       aiResponse += ` <span class="memory-highlight">I remember you mentioned ${memoryText}</span> How does that relate to what you're sharing now?`;
+      console.log("API_CHAT_MEMORY_REFERENCED:", memoryReference.key);
     }
 
     // Save AI response
     const aiMessageRecord = await prisma.message.create({
       data: {
         conversationId: conversation.id,
-        sender: "ai",
-        text: aiResponse,
+        isUserMessage: false, // Correct field and type
+        content: aiResponse,  // Correct field
       },
     });
+    console.log("API_CHAT_AI_MESSAGE_SAVED:", aiMessageRecord.id);
 
-    return NextResponse.json({
-      userMessage: userMessage,
-      aiMessage: aiMessageRecord,
-      messageCount: messageCount + 1,
-      messageLimit,
-    });
+
+    // Trigger vector DB ingestion for AI message
+    if (aiMessageRecord && aiMessageRecord.id) {
+      // Intentionally not awaiting, let it run in background
+      triggerVectorIngestionForMessage(aiMessageRecord.id)
+        .catch(err => console.error("API_CHAT_ERROR: Failed to trigger vector ingestion for AI message:", err));
+    }
+
     const successResponse = {
-      userMessage: userMessage,
-      aiMessage: aiMessageRecord,
-      messageCount: messageCount + 1,
+      userMessage: userMessage, // This should be the object from prisma.message.create
+      aiMessage: aiMessageRecord, // This should be the object from prisma.message.create
+      messageCount: messageCount + 1, 
       messageLimit,
     };
+
+    // Check and trigger summary generation
+    if (conversation && conversation.id) {
+      // Pass the count of all messages in the conversation so far (including the one just saved)
+      // The summarizer itself fetches the latest count if needed, or can be passed messageCount + 1
+      await checkAndTriggerSummary(conversation.id);
+    }
+
     console.log("API_CHAT_SENDING_SUCCESS_RESPONSE:", successResponse);
-    return NextResponse.json(successResponse);
+    // The return NextResponse.json() was duplicated in previous versions, ensuring only one remains.
+    return NextResponse.json(successResponse); 
   } catch (error) {
     console.error("API_CHAT_ERROR_CAUGHT:", error);
     const errorResponse = { error_code: "INTERNAL_SERVER_ERROR", message: "An unexpected error occurred. Please try again later." };

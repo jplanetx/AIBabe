@@ -19,6 +19,7 @@ model User {
   updatedAt     DateTime  @updatedAt
   conversations Conversation[]
   subscription  Subscription?
+  preferences   UserPreference[]
 }
 
 model Girlfriend {
@@ -41,6 +42,7 @@ model Conversation {
   messages     Message[]
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   girlfriend   Girlfriend @relation(fields: [girlfriendId], references: [id], onDelete: Cascade)
+  summary      ConversationSummary? // Relation to ConversationSummary model
 }
 
 model Message {
@@ -72,4 +74,28 @@ model Memory {
   updatedAt    DateTime  @updatedAt
 
   @@unique([key, conversationId])
+}
+
+model UserPreference {
+  id        String   @id @default(cuid())
+  userId    String   // Foreign key to User model
+  key       String   // Preference key (e.g., "communication_style", "preferred_name")
+  value     String   // Preference value
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key]) // Ensures a user has only one value per preference key
+}
+
+model ConversationSummary {
+  id             String   @id @default(cuid())
+  conversationId String   @unique // Foreign key to Conversation model, unique because one summary per convo
+  summary        String   @db.Text // Use Text type for potentially long summaries
+  summarizedAt   DateTime // Timestamp of when the summary was generated
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
