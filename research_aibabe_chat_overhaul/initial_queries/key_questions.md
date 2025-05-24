@@ -1,62 +1,60 @@
-# Key Research Questions: AI-Babe Chat System Overhaul
+# Key Research Questions
 
-This document outlines the key questions that will guide the research for the "AI-Babe Chat System Overhaul" project. These questions are derived from the project's overall goal, the user's objective to improve chat quality and reduce repetition, and the specific tasks outlined in the User Blueprint.
+This document outlines the critical questions to be addressed during the research phase for the "Implement Enhanced Chat Functionality with User Authentication and Semantic Search" project. These questions are derived from the research objectives and the defined scope.
 
-## I. Overall Project & User Experience
+## 1. Tech Stack Integration (Next.js, TypeScript, Supabase, Pinecone, OpenAI)
+    - What are the established best practices for integrating Supabase (auth & DB) with a Next.js (TypeScript) application?
+    - What are the best practices for integrating Pinecone with a Next.js backend for semantic search?
+    - How should OpenAI's embedding service be integrated for generating embeddings from chat messages to be stored in Pinecone?
+    - What are common challenges and pitfalls when combining these specific technologies, and what are their mitigation strategies?
+    - Are there specific Next.js architectural patterns (e.g., API routes, server components, client components) that are best suited for interacting with Supabase and Pinecone?
+    - What are the version compatibility considerations between these services/libraries?
 
-1.  What are the primary causes of the chatbot "repeating itself after just a few back and forths," and how can the proposed tasks (memory, vector DB, prompt engineering) directly address this?
-2.  How can the overhaul ensure a more "intelligent" and "consistent" chat experience from the user's perspective?
-3.  What are the key performance indicators (KPIs) for a successful chat system overhaul in this context (e.g., reduced repetition, increased session length, positive user feedback on memory/consistency)?
-4.  Considering the Next.js/Vercel stack, what are the overarching architectural best practices for building a scalable and maintainable chat system with advanced memory and RAG capabilities?
+## 2. User Authentication (Supabase in Next.js)
+    - What are the most secure and user-friendly patterns for implementing user authentication (signup, login, logout, password reset, session management) with Supabase in a Next.js application?
+    - How should Supabase Auth integrate with Next.js middleware or route handlers for protecting routes?
+    - What are best practices for managing user sessions and tokens (e.g., refresh tokens, secure storage)?
+    - How can social logins (e.g., Google, GitHub) be implemented with Supabase Auth in Next.js?
+    - What are the specific security considerations (e.g., XSS, CSRF, data validation) for Supabase authentication in this stack?
 
-## II. Task-Specific Questions
+## 3. Semantic Search Implementation (Pinecone & OpenAI)
+    - What is the optimal data model/schema for storing chat message embeddings and metadata in Pinecone for efficient semantic search?
+    - What are the best practices for data ingestion into Pinecone, including batching, error handling, and updating existing vectors?
+    - Which OpenAI embedding model (e.g., `text-embedding-ada-002` or newer/alternative models) offers the best balance of performance, cost, and quality for chat message semantics? What are the dimensionalities and how do they impact Pinecone?
+    - How should queries be constructed and executed against Pinecone from the Next.js backend to retrieve relevant chat history based on semantic similarity?
+    - What strategies can be used to filter search results by user, conversation, or other metadata in Pinecone?
+    - How can the performance of semantic search (latency, relevance) be optimized?
+    - What are the cost implications of using Pinecone and OpenAI embeddings at scale?
 
-### A. TASK 1 — Backend API Resilience
+## 4. Database Management (Supabase/PostgreSQL & Prisma)
+    - What are the definitive steps and configurations to resolve the `P1001: Can't reach database server` error when using Prisma with Supabase (PostgreSQL)? This includes connection string formats, SSL requirements, network configurations (if applicable), and Prisma client generation.
+    - What are the best practices for managing database migrations with Prisma in a Supabase environment (e.g., `prisma migrate dev`, `prisma migrate deploy`)?
+    - How should connection pooling be configured for Prisma with Supabase to ensure optimal performance and avoid connection exhaustion?
+    - What are common issues and solutions related to Prisma's interaction with Supabase's PostgreSQL instance (e.g., roles, permissions, extensions)?
+    - How can database backups and recovery be managed effectively with Supabase?
+    - Are there specific Prisma client configurations or query patterns that are more performant with Supabase?
 
-1.  What are the most effective and idiomatic ways to implement `try/catch` blocks for `fetch/axios` requests in Next.js API routes (specifically for chat interactions)?
-2.  What are best practices for designing user-friendly fallback UIs and error messages in a chat interface when backend APIs fail or return errors?
-3.  How can exponential backoff be implemented robustly for API retries (503/504 errors) in a serverless environment like Vercel, considering potential cold starts and execution limits?
-4.  What constitutes a comprehensive and standardized error response schema (e.g., `{ error_code, message }`) for chat backend APIs that is useful for both frontend handling and backend logging/debugging?
-5.  Are there specific libraries or patterns recommended for managing API resilience in Next.js/Vercel deployments?
+## 5. Data Flow & Management
+    - What is the recommended data flow for a new chat message: from user input in Next.js frontend, to Next.js backend, to Supabase for persistent storage, to OpenAI for embedding, and then to Pinecone for indexing?
+    - How should data consistency be maintained between Supabase (primary data store) and Pinecone (search index)? What are strategies for handling updates or deletions?
+    - What are the security best practices for handling API keys and sensitive data (`DATABASE_URL`, `PINECONE_API_KEY`, `OPENAI_API_KEY`) within a Next.js application, particularly concerning `[.env.local](.env.local)` and environment variable management in Vercel/deployment?
+    - How should user-specific data be isolated and secured across these services?
 
-### B. TASK 2 — Implement Persistent Memory Layer
+## 6. Acceptance Testing Informants
+    - What are typical end-to-end user flows for a chat application with authentication and semantic search? (e.g., User signs up -> logs in -> starts a new chat -> sends messages -> AI responds -> user searches past conversations -> views search results).
+    - What are the key success criteria for each part of these flows? (e.g., successful login redirects to chat, search results are relevant and timely).
+    - How can the "enhanced" aspects of the chat (beyond basic messaging) be verified through acceptance tests?
+    - What edge cases or error conditions should be considered for acceptance tests (e.g., failed login, empty search results, API errors from Supabase/Pinecone/OpenAI)?
 
-1.  What are the specific pros and cons of using PostgreSQL versus MongoDB for a persistent memory layer (user preferences, conversation summaries) in a Next.js/Vercel application, considering schema flexibility, query capabilities, scalability, and ease of integration?
-2.  What is an optimal and extensible database schema for storing `user_id`, `preferences`, `conversation_summary`, and `timestamp` to support long-term memory and recall?
-3.  What are the most efficient strategies for loading user-specific memory at the start of a chat session and updating it at the end (or incrementally) without negatively impacting perceived performance?
-4.  Which LLM-based summarization techniques and models are most effective and cost-efficient for summarizing large chat conversations for storage, and how can this be integrated into the Next.js backend?
-5.  How can potential PII (Personally Identifiable Information) in conversation summaries be handled or minimized?
+## 7. Master Project Plan Informants
+    - What are the logical, sequential tasks required to implement user authentication with Supabase?
+    - What are the distinct tasks for setting up Pinecone, creating an index, implementing embedding generation, and building the search query logic?
+    - What specific tasks are needed to resolve database connectivity issues and establish a robust Prisma-Supabase setup?
+    - How can the overall project be broken down into smaller, AI-verifiable milestones?
+    - What are the dependencies between these high-level tasks?
 
-### C. TASK 3 — Add Semantic Memory (Vector DB)
-
-1.  What are the key differentiators, advantages, and disadvantages of leading vector database solutions (e.g., Pinecone, Weaviate, Supabase pgvector, ChromaDB, Qdrant) when integrated with a Next.js/Vercel application, focusing on ease of use, cost, scalability, and query latency?
-2.  Which embedding models (e.g., OpenAI's `text-embedding-ada-002`, Sentence Transformers from HuggingFace) offer the best balance of performance, cost, and semantic relevance for chat conversation data?
-3.  What are best practices for chunking long conversation turns or entire conversations for effective embedding and retrieval? What metadata or tags are most useful to store alongside conversation chunks?
-4.  How can cosine similarity (or other similarity metrics) be most effectively used to query the vector DB during prompt construction to retrieve relevant past interactions or preferences?
-5.  What are the practical challenges and solutions for integrating a vector DB into a RAG pipeline to enhance persona consistency and contextual responses?
-6.  How does the choice of vector DB impact data management, backup, and security considerations?
-
-### D. TASK 4 — Fix Persona Drift via Prompt Engineering
-
-1.  What are established best practices for designing layered system prompts (e.g., a base persona prompt + dynamically injected memory/RAG context) to maintain a consistent AI persona (flirty, smart, caring)?
-2.  How can a RAG pipeline be effectively designed to inject persona-specific facts, preferences, and past interaction snippets into the prompt at each turn?
-3.  What techniques exist to "pin" or reinforce the core persona context in every interaction without consuming an excessive number of tokens in the prompt?
-4.  Is there publicly available information or research on the "PersonaGym" method, and what are its core principles if so? If not, what are analogous or well-regarded methodologies for persona consistency?
-5.  How can the system be designed to dynamically adjust the amount or type of contextual information (from persistent or semantic memory) injected into the prompt based on the current conversation state or user query?
-6.  What are common pitfalls in prompt engineering for persona consistency, and how can they be avoided?
-
-### E. TASK 5 — Chat Frontend Error Handling & UX
-
-1.  What are robust JavaScript/TypeScript patterns for adding error guards to asynchronous chat message handlers in a React/Next.js frontend?
-2.  How can the frontend display clear, non-intrusive error messages and provide intuitive retry options to the user when chat messages fail to send or responses are not received?
-3.  What are the current best practices and libraries for implementing response streaming from Next.js API routes to a React frontend to improve the perceived responsiveness of the chat UI?
-4.  What are the key mobile responsiveness and accessibility (WCAG) compliance considerations specifically for chat interfaces, including input areas, message display, and interactive elements like retry buttons?
-5.  How can frontend state management (e.g., Zustand, Redux, React Context) be effectively used to manage chat state, including pending messages, error states, and streamed responses?
-
-## III. Cross-Cutting & Orchestration Questions
-
-1.  What are the potential performance bottlenecks when integrating these different layers (API resilience, persistent memory, vector DB, advanced prompting, frontend UX) in a Next.js/Vercel environment, and how can they be proactively addressed?
-2.  How can the requirement for modules to be <500 LOC be practically achieved while implementing these complex features, and what architectural patterns support this (e.g., microservices-like API routes, clear separation of concerns)?
-3.  What are effective integration testing strategies for a system with these interconnected components, especially when deployed on Vercel? How can dependencies between tasks (as per orchestration notes) be managed in the testing plan?
-4.  Given the orchestration notes (stabilize backend/frontend first, then parallel memory/vector DB, then prompting), what are the critical interfaces and data contracts that need to be defined early to allow for parallel development?
-5.  What are the security implications of storing user conversation data (even summarized) and preferences, and what are best practices for securing this data both in transit and at rest, particularly with PostgreSQL/MongoDB and vector DBs?
+## 8. Architectural Patterns
+    - Given the tech stack, what are common and recommended architectural patterns for structuring the Next.js application (frontend and backend/API routes)?
+    - How should services like Supabase, Pinecone, and OpenAI clients be initialized and managed within the Next.js application lifecycle?
+    - What are considerations for state management in the Next.js frontend, especially concerning user authentication status and chat data?
+    - If `[docs/data_storage_architecture.md](docs/data_storage_architecture.md)` is unavailable, what would be a typical data storage architecture for this system, considering data relationships, access patterns, and the roles of Supabase and Pinecone?

@@ -3,8 +3,11 @@
 
 generator client {
   provider = "prisma-client-js"
+  output   = "../../node_modules/.prisma/client"
 }
 
+// Load environment variables
+// @ts-ignore
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -20,6 +23,7 @@ model User {
   conversations Conversation[]
   subscription  Subscription?
   preferences   UserPreference[]
+  feedbacks     Feedback[]
 }
 
 model Girlfriend {
@@ -43,6 +47,7 @@ model Conversation {
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   girlfriend   Girlfriend @relation(fields: [girlfriendId], references: [id], onDelete: Cascade)
   summary      ConversationSummary? // Relation to ConversationSummary model
+  feedbacks    Feedback[]
 }
 
 model Message {
@@ -98,4 +103,27 @@ model ConversationSummary {
   updatedAt      DateTime @updatedAt
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+model Feedback {
+  id              String    @id @default(cuid())
+  conversationId  String
+  userId          String?   // Optional: if feedback can be anonymous or system-generated
+  rating          Int       // e.g., 1-5 for stars, or specific values for thumbs up/down
+  optionalComment String?
+  createdAt       DateTime  @default(now())
+
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user            User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([userId])
+}
+model Profile {
+  id        String   @id // Stores Supabase auth.users.id (UUID)
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("profiles")
 }

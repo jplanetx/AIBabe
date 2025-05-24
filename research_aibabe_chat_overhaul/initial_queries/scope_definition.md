@@ -1,53 +1,42 @@
-# Research Scope Definition: AI-Babe Chat System Overhaul
+# Research Scope Definition
 
-## 1. Introduction
+## Project Goal
+Implement Enhanced Chat Functionality with User Authentication and Semantic Search.
 
-This document defines the scope of research for the "AI-Babe Chat System Overhaul" project. The primary goal of this research is to gather information that will inform the SPARC Specification phase, specifically the definition of high-level acceptance tests (HLATs) and the Master Project Plan (MPP). The overall user objective is to "Fix the chat. Improve the chat. It is terrible right now repeating itself after just a few back and forths."
+## Technology Stack
+-   Framework: Next.js, TypeScript
+-   Authentication & Database: Supabase (PostgreSQL backend)
+-   Semantic Search: Pinecone
+-   Embedding Service: OpenAI
+-   Configuration: `[.env.local](.env.local)`
+-   Schema: `[prisma/schema.prisma](prisma/schema.prisma)`
+-   Current Vector DB (mocked): `[lib/vector_db.ts](lib/vector_db.ts)`
 
-## 2. In Scope
+## Key Research Areas
+1.  **Tech Stack Integration:** Best practices, challenges, and strategies for integrating Next.js, TypeScript, Supabase, Pinecone, and OpenAI embeddings.
+2.  **User Authentication:** Robust patterns for Supabase authentication in Next.js, including session management, security considerations, and user experience.
+3.  **Semantic Search Implementation:**
+    *   Pinecone integration best practices.
+    *   Data ingestion strategies for chat messages.
+    *   Embedding generation using OpenAI (model `text-embedding-ada-002` or alternatives).
+    *   Querying Pinecone from a Next.js backend for relevant chat history.
+4.  **Database Management (Supabase/PostgreSQL & Prisma):**
+    *   Strategies for reliable setup and connectivity, addressing the `P1001: Can't reach database server` error.
+    *   Prisma migration management best practices with Supabase.
+    *   Connection pooling and optimization.
+5.  **Data Flow & Management:** Key considerations for data movement, consistency, and security between services (Next.js frontend/backend, Supabase, Pinecone, OpenAI).
+6.  **Acceptance Testing Informants:** Information to define high-level, end-to-end acceptance tests for the complete enhanced chat functionality. This includes user registration, login, sending messages, receiving AI responses, and semantic search of chat history.
+7.  **Master Project Plan Informants:** Information crucial for creating a detailed Master Project Plan with AI-verifiable tasks. This involves breaking down the implementation into manageable, verifiable steps.
+8.  **Architectural Patterns:** Common architectural patterns for applications using this tech stack, especially if `[docs/data_storage_architecture.md](docs/data_storage_architecture.md)` remains unavailable. This includes considerations for scalability, maintainability, and security.
 
-The research will cover the following areas, derived from the User Blueprint tasks:
+## Out of Scope (Initial Focus)
+-   Detailed UI/UX design beyond functional requirements for chat and authentication.
+-   Advanced AI persona development beyond the existing `[docs/persona_psychology_principles.md](docs/persona_psychology_principles.md)` and `[prompts/example_refined_persona.md](prompts/example_refined_persona.md)`.
+-   Deployment and infrastructure scaling in detail (though high-level considerations might be noted).
+-   Billing and subscription management implementation details beyond basic schema presence.
 
-*   **Backend API Resilience (Task 1):**
-    *   Best practices for error handling (try/catch) in API requests (fetch/axios) within a Next.js backend.
-    *   Strategies for user-friendly fallback UIs in chat applications during API failures.
-    *   Implementation of exponential backoff for retrying failed requests (e.g., 503/504 errors), particularly in a Vercel (serverless) environment.
-    *   Standardized error response schemas for chat APIs.
-*   **Persistent Memory Layer (Task 2):**
-    *   Comparison and suitability of PostgreSQL vs. MongoDB for storing user preferences, conversation summaries, and timestamps in a Next.js application.
-    *   Optimal schema design for the persistent memory layer.
-    *   Efficient techniques for loading and updating memory during user sessions.
-    *   Best practices and tools for LLM-based summarization of chat conversations for storage.
-*   **Semantic Memory (Vector DB) (Task 3):**
-    *   Evaluation of vector database solutions (e.g., Pinecone, Weaviate) for integration with a Next.js application on Vercel, considering cost, scalability, ease of use, and performance.
-    *   Comparison of embedding generation models (e.g., OpenAI, HuggingFace) for chat data.
-    *   Strategies for effective chunking of conversation data and application of tags for semantic search.
-    *   Efficient querying techniques (e.g., cosine similarity) within the prompt generation pipeline.
-    *   Role of semantic memory in advanced Retrieval Augmented Generation (RAG) and maintaining persona consistency.
-*   **Persona Drift & Prompt Engineering (Task 4):**
-    *   Established techniques for layered system prompts (core persona + dynamic context/memory).
-    *   Effective use of RAG pipelines to inject persona-specific facts and maintain character.
-    *   Methods to consistently apply persona context ("pinning") each turn without excessive token consumption.
-    *   Exploration of methodologies like "PersonaGym" if public information is available.
-*   **Chat Frontend Error Handling & UX (Task 5):**
-    *   Robust error handling patterns for asynchronous chat handlers in React/Next.js.
-    *   Design of non-intrusive error messages and retry options in chat UIs.
-    *   Best practices for streaming API responses in Next.js for enhanced chat UX.
-    *   Key considerations for mobile responsiveness and accessibility in chat interfaces.
-
-*   **Cross-Cutting Concerns:**
-    *   Potential challenges, common pitfalls, and mitigation strategies for each area.
-    *   Technology choices relevant to the Next.js and Vercel stack.
-    *   Ensuring modularity (modules <500 LOC) and testability.
-    *   Integration testing strategies for the interconnected components on Vercel.
-    *   Performance implications of each new layer on chat responsiveness.
-
-## 3. Out of Scope
-
-The research will NOT cover:
-
-*   Detailed, low-level implementation code or specific code snippets beyond illustrative examples of patterns.
-*   Specific UI/UX design mockups beyond principles for error states and feedback.
-*   Marketing strategies, user acquisition, or business model analysis.
-*   Deep dives into unrelated audit items (AIB-002, AIB-005, AIB-003, audit 1.2) beyond the problems they highlight in the blueprint; the research will focus on solving the stated problems.
-*   Features not explicitly mentioned in the User Blueprint.
+## Contextual Constraints & Considerations
+-   The `P1001: Can't reach database server` error needs specific attention regarding Supabase/Prisma connectivity.
+-   The unavailability of `[docs/data_storage_architecture.md](docs/data_storage_architecture.md)` means research should cover common patterns.
+-   Review of `[docs/persona_psychology_principles.md](docs/persona_psychology_principles.md)` and `[prompts/example_refined_persona.md](prompts/example_refined_persona.md)` for chat interaction context.
+-   The existing `[lib/vector_db.ts](lib/vector_db.ts)` provides a baseline for current (mocked) semantic search functionality.

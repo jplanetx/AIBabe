@@ -1,47 +1,26 @@
 # References - Part 1
 
-This document lists all cited sources from the initial research phase for the AI-Babe Chat System Overhaul project.
+This document lists all cited sources from the research process.
 
-## Query 1: Best practices for chatbot architecture
-*   [1.1] https://aws.amazon.com/blogs/security/hardening-the-rag-chatbot-architecture-powered-by-amazon-bedrock-blueprint-for-secure-design-and-anti-pattern-migration/
-*   [1.2] https://www.conversationdesigninstitute.com/topics/best-practices
-*   [1.3] https://www.lucentinnovation.com/blogs/technology-posts/the-ultimate-guide-on-chatbot-development-and-how-it-works
-*   [1.4] https://www.freshworks.com/chatbots/best-practices/
-*   [1.5] https://research.aimultiple.com/chatbot-architecture/
+## P1001 Error & Supabase/Prisma Connectivity:
+1.  Prisma GitHub Discussion on P1001 with Supabase. (2023). *GitHub*. Retrieved from [https://github.com/prisma/prisma/discussions/23589](https://github.com/prisma/prisma/discussions/23589)
+2.  RedwoodJS Community. (n.d.). *Tutorial: Error P1001: Can't reach database server at ... when attempting to recreate Prisma migration to Railway Postgre*. RedwoodJS Community. Retrieved from [https://community.redwoodjs.com/t/tutorial-error-p1001-cant-reach-database-server-at-postgres-railway-internal-5432-when-attempting-to-recreate-prisma-migration-to-railway-postgre/7540](https://community.redwoodjs.com/t/tutorial-error-p1001-cant-reach-database-server-at-postgres-railway-internal-5432-when-attempting-to-recreate-prisma-migration-to-railway-postgre/7540)
+3.  [YouTube Video on P1001 Error]. (n.d.). *YouTube*. Retrieved from [https://www.youtube.com/watch?v=73TjCnFsH88](https://www.youtube.com/watch?v=73TjCnFsH88) (Note: Specific video title and uploader would be ideal if available from search metadata)
+4.  Microsoft Learn. (n.d.). *Intermittent connection issues with Azure MySQL Flexible Server*. Microsoft Learn. Retrieved from [https://learn.microsoft.com/en-us/answers/questions/2109048/intermittent-connection-issues-with-azure-mysql-fl](https://learn.microsoft.com/en-us/answers/questions/2109048/intermittent-connection-issues-with-azure-mysql-fl) (Note: Context is Azure MySQL, but P1001 is a general Prisma error code)
+5.  Supabase Docs. (n.d.). *Prisma Troubleshooting*. Supabase. Retrieved from [https://supabase.com/docs/guides/database/prisma/prisma-troubleshooting](https://supabase.com/docs/guides/database/prisma/prisma-troubleshooting)
 
-## Query 2: Robust error handling and retry mechanisms for backend chat APIs (Node.js, Next.js, fetch, axios)
-*   [2.1] https://dev.to/amritak27/advanced-error-handling-in-nodejs-1ep8
-*   [2.2] https://betterstack.com/community/guides/scaling-nodejs/error-handling-express/
-*   [2.3] https://alerty.ai/blog/node-throw-error
-*   [2.4] https://www.youtube.com/watch?v=EUYnERcOGpA
-*   [2.5] https://www.esparkinfo.com/blog/reactjs-with-golang.html (Note: This citation's direct relevance to Node.js/Next.js error handling was questioned in primary findings.)
+## Supabase Authentication in Next.js (App Router):
+6.  Permit.io Blog. (n.d.). *Supabase Authentication and Authorization in NextJS: Implementation Guide*. Retrieved from https://www.permit.io/blog/supabase-authentication-and-authorization-in-nextjs-implementation-guide
+7.  Techstaunch. (n.d.). *Implementing Authentication in Next.js with Supabase*. Retrieved from https://techstaunch.com/blogs/implementing-authentication-in-next-js-with-supabase?tech_blog=true
+8.  Supabase Docs. (n.d.). *AI Prompts: NextJS Supabase Auth*. Retrieved from https://supabase.com/docs/guides/getting-started/ai-prompts/nextjs-supabase-auth
+9.  Teknasyon Engineering Blog. (n.d.). *Next.js with Supabase Google Login: Step-by-Step Guide*. Retrieved from https://engineering.teknasyon.com/next-js-with-supabase-google-login-step-by-step-guide-088ef06e0501
+10. YouTube. (n.d.). *[Video on Supabase OAuth with Next.js]*. Retrieved from https://www.youtube.com/watch?v=D3HC_NyrTe8 (Note: Specific video title and uploader needed for full citation.)
 
-## Query 3: Implementing persistent chatbot memory layer (PostgreSQL/MongoDB, schema, summarization)
-*   [3.1] https://github.com/langchain-ai/memory-template
-*   [3.2] https://chatbotdesign.substack.com/p/add-memory-to-chatbots-with-mem0
-*   [3.3] https://airbyte.com/blog/aws-ai-chatbot-using-faiss-vector-store
-*   [3.4] https://blog.dailydoseofds.com/p/build-human-like-memory-for-your
-*   [3.5] https://python.langchain.com/docs/tutorials/chatbot/
+## Pinecone & OpenAI Integration for Semantic Search in Next.js:
+11. YouTube - Code With Ania Kubow. (Approx. Nov 2023). *Build Your Own AI PDF CHATBOT - LangChain, Pinecone, Next.js, OpenAI*. Retrieved from https://www.youtube.com/watch?v=GUgUU4MicbE
+12. Pinecone Docs. (n.d.). *Legal Semantic Search Example*. Retrieved from https://docs.pinecone.io/examples/sample-apps/legal-semantic-search
+13. YouTube - James Q Quick. (Approx. Oct 2023). *Build a Chat With PDF App using Next.js, LangChain, Pinecone, and OpenAI*. Retrieved from https://www.youtube.com/watch?v=SyuhQ_OtqV0
+14. Stackademic Blog. (n.d.). *Building Smarter Job Matching Systems with AI: NestJS, Pinecone, MongoDB, and OpenAI in Action*. Retrieved from https://blog.stackademic.com/building-smarter-job-matching-systems-with-ai-nestjs-pinecone-mongodb-and-openai-in-action-7b9139e6bc49
+15. GitHub - nlawz/openrouter-pinecone. (n.d.). *OpenRouter <> Pinecone Integration Example*. Retrieved from https://github.com/nlawz/openrouter-pinecone
 
-## Query 4: Integrating vector database (Pinecone/Weaviate) with embeddings (OpenAI/HuggingFace) for RAG
-*   [4.1] https://dev.to/dandv/how-to-choose-a-vector-database-pinecone-weaviate-mongodb-atlas-semadb-a09
-*   [4.2] https://research.aimultiple.com/vector-database-for-rag/
-*   [4.3] https://www.datacamp.com/blog/the-top-5-vector-databases
-*   [4.4] https://milvus.io/ai-quick-reference/how-do-i-choose-between-pinecone-weaviate-milvus-and-other-vector-databases
-*   [4.5] https://liquidmetal.ai/casesAndBlogs/vector-comparison/
-
-## Query 5: Prompt engineering for persona consistency (layered prompts, RAG, context pinning, PersonaGym)
-*   [5.1] https://aws.amazon.com/blogs/machine-learning/prompt-engineering-techniques-and-best-practices-learn-by-doing-with-anthropics-claude-3-on-amazon-bedrock/
-*   [5.2] https://www.human-i-t.org/beginner-guide-prompt-engineering/
-*   [5.3] https://genai.byu.edu/prompt-engineering
-*   [5.4] https://www.lakera.ai/blog/prompt-engineering-guide
-*   [5.5] https://www.pluralsight.com/resources/blog/ai-and-data/prompt-engineering-techniques
-
-## Query 6: Frontend error handling UX for chat applications (Next.js, React, error guards, retry, streaming, mobile, accessibility)
-*   [6.1] https://alerty.ai/blog/nextjs-error-handling
-*   [6.2] https://devanddeliver.com/blog/frontend/next-js-15-error-handling-best-practices-for-code-and-routes
-*   [6.3] https://betterstack.com/community/guides/scaling-nodejs/error-handling-nextjs/
-*   [6.4] https://www.youtube.com/watch?v=WBACCNJAzog
-*   [6.5] https://www.dhiwise.com/post/nextjs-error-boundary-best-practices
-
-*(This list will be expanded if further research cycles yield new citable sources.)*
+*(Further references will be added as research progresses.)*
