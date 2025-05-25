@@ -55,9 +55,12 @@ const supabase = createClient();
         />
       </label>
       <br />
-      <button type="submit">Get Started</button>
+      <button type="submit" disabled={isLoading}>
+        {isLoading ? 'Creating account...' : 'Get Started'}
+      </button>
     </form>
   );
 };
 
+export default OnboardingForm;
 export default OnboardingForm;

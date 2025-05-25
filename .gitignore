@@ -3,6 +3,9 @@ node_modules/
 .next/
 out/
 dist/
+.cache/
+upload.zip
+build-and-package.sh
 
 # Logs
 logs/

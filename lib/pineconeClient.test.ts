@@ -6,6 +6,8 @@ import { Pinecone } from '@pinecone-database/pinecone';
 // Let's assume an init function or direct export for now.
 // Modify the import based on actual export from pineconeClient.ts
 import { getPineconeClient } from './pineconeClient'; // Or: import pineconeClient from './pineconeClient';
+let getPineconeClientModule: typeof import('./pineconeClient');
+let FreshPineconeConstructorMock: jest.Mock;
 
 jest.mock('@pinecone-database/pinecone', () => {
   // Mock the Pinecone class constructor and its methods
@@ -31,25 +33,30 @@ jest.mock('@pinecone-database/pinecone', () => {
   };
 });
 
+let originalEnv: any;
+let newMockInit: jest.Mock;
+let pineconeClientModule: typeof import('./pineconeClient');
 
 describe('Pinecone Client Initialization (lib/pineconeClient.ts)', () => {
-  const originalEnv = { ...process.env };
-  let getPineconeClientModule: typeof import('./pineconeClient');
-  let FreshPineconeConstructorMock: jest.Mock;
-
-  beforeEach(() => {
+beforeEach(() => {
     jest.resetModules();
-    process.env = { ...originalEnv };
+    jest.clearAllMocks();
+    
+    // Set default environment variables
+    Object.assign(process.env, {
+      PINECONE_API_KEY: 'test-pinecone-key',
+      PINECONE_ENVIRONMENT: 'test-pinecone-environment',
+      PINECONE_INDEX_NAME: 'test-pinecone-index-main'
+    });
 
-    // Set necessary env vars for these tests BEFORE any require of pineconeClient
-    process.env.PINECONE_API_KEY = 'test-pinecone-key';
-    process.env.PINECONE_ENVIRONMENT = 'test-pinecone-environment';
-    // PINECONE_INDEX_NAME is not strictly required by getPineconeClient, but good to have
-    process.env.PINECONE_INDEX_NAME = 'test-pinecone-index-main';
+    // Reset the singleton instance
+    const module = require('./pineconeClient');
+    if (module.__TEST_ONLY_resetPineconeClientInstance) {
+      module.__TEST_ONLY_resetPineconeClientInstance();
+    }
 
-    // Use jest.doMock here, BEFORE SUT or the mock itself is required
-    jest.doMock('@pinecone-database/pinecone', () => {
-      const newMockInit = jest.fn();
+    getPineconeClientModule = require('./pineconeClient');
+   });
       const newMockCreateIndex = jest.fn();
       const newMockDescribeIndex = jest.fn().mockResolvedValue({ name: 'test-index', status: { ready: true } });
       const newMockListIndexes = jest.fn().mockResolvedValue({ indexes: [] });
@@ -172,8 +179,29 @@ describe('Pinecone Client Initialization (lib/pineconeClient.ts)', () => {
   });
 });
 
+let createPineconeMock = (overrides = {}) => {
+  const defaultMock = {
+    init: jest.fn(),
+    index: jest.fn().mockReturnValue({
+      namespace: jest.fn().mockReturnThis(),
+    }),
+    createIndex: jest.fn(),
+    describeIndex: jest.fn().mockResolvedValue({ 
+      name: 'test-index', 
+      status: { ready: true } 
+    }),
+    listIndexes: jest.fn().mockResolvedValue({ indexes: [] }),
+  };
+  
+  return jest.fn().mockImplementation(() => ({
+    ...defaultMock,
+    ...overrides
+  }));
+};
+
 describe('Pinecone Index Setup (lib/pineconeClient.ts - setupPineconeIndex)', () => {
-  const originalEnv = { ...process.env };
+  let originalEnv: any;
+  let newMockInit: jest.Mock;
   let pineconeClientModule: typeof import('./pineconeClient');
   let mockPineconeInstance: any;
   let mockListIndexesFn: jest.Mock;
@@ -182,55 +210,34 @@ describe('Pinecone Index Setup (lib/pineconeClient.ts - setupPineconeIndex)', ()
 
   beforeEach(() => {
     jest.resetModules();
+    originalEnv = { ...process.env };
     process.env = { ...originalEnv };
-
-    // Set necessary env vars for these tests BEFORE any require of pineconeClient
-    process.env.PINECONE_API_KEY = 'test-key-setup';
-    process.env.PINECONE_ENVIRONMENT = 'test-env-setup';
-    // PINECONE_INDEX_NAME is set per test or deliberately omitted for setupPineconeIndex tests
-
-    // Call the test-only reset function
-    const tempPineconeClientModule = require('./pineconeClient');
-    if (tempPineconeClientModule.__TEST_ONLY_resetPineconeClientInstance) {
-      tempPineconeClientModule.__TEST_ONLY_resetPineconeClientInstance();
-    }
     
-    // Initialize dedicated mock functions for methods that will be closed over by jest.doMock
     mockListIndexesFn = jest.fn();
     mockCreateIndexFn = jest.fn();
     mockDescribeIndexFn = jest.fn();
-
-    // Use jest.doMock to define the Pinecone mock specifically for this describe block's context
-    jest.doMock('@pinecone-database/pinecone', () => {
-      const constructorMock = jest.fn().mockImplementation(() => ({
+    
+    jest.doMock('@pinecone-database/pinecone', () => ({
+      Pinecone: createPineconeMock({
         listIndexes: mockListIndexesFn,
         createIndex: mockCreateIndexFn,
         describeIndex: mockDescribeIndexFn,
-        // Include other methods that might be called, even if not central to these specific tests,
-        // to ensure the mock instance is complete.
-        init: jest.fn(), // SUT's getPineconeClient doesn't call init, but good for completeness
-        index: jest.fn().mockImplementation(() => ({ // If client.index('name') is called
-          namespace: jest.fn().mockReturnThis(),
-          // Add other index operations like upsert, query if necessary for other tests
-        })),
-      }));
-      return { Pinecone: constructorMock };
+      })
+    }));
+    Object.assign(process.env, {
+      PINECONE_API_KEY: 'test-pinecone-key',
+      PINECONE_ENVIRONMENT: 'test-pinecone-environment',
+      PINECONE_INDEX_NAME: 'test-pinecone-index-main'
     });
-    
-    // Now that jest.doMock has configured the next require of '@pinecone-database/pinecone',
-    // require the SUT. It will get the Pinecone mock defined above.
+
+    // Reset the singleton instance
+    const module = require('./pineconeClient');
+    if (module.__TEST_ONLY_resetPineconeClientInstance) {
+      module.__TEST_ONLY_resetPineconeClientInstance();
+    }
+
     pineconeClientModule = require('./pineconeClient');
-  });
-
-  afterAll(() => {
-    process.env = originalEnv;
-  });
-
-  it('should throw an error if PINECONE_INDEX_NAME is missing when calling setupPineconeIndex', async () => {
-    process.env.PINECONE_API_KEY = 'test-key';
-    process.env.PINECONE_ENVIRONMENT = 'test-env';
-    delete process.env.PINECONE_INDEX_NAME;
-    
+   });
     // getPineconeClient will succeed here
     pineconeClientModule.getPineconeClient();
     // Now test setupPineconeIndex

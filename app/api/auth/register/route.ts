@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     console.error('Supabase sign up error:', error);
-    return NextResponse.json({ error: error.message || 'Could not sign up user' }, { status: error.status || 500 });
+    return NextResponse.json({ error: 'Registration failed. Please try again.' }, { status: error.status || 500 });
   }
 
   if (!data.session && data.user?.identities?.length === 0) {

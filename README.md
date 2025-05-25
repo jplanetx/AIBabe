@@ -68,7 +68,24 @@ Tasks are defined in:
 
 ---
 
-## 📦 Deployment (DigitalOcean)
+## 📦 Build and Packaging
+
+To build the project, generate the Prisma client, run tests, and package the necessary files for deployment (e.g., to Gemini), use the `build-and-package.sh` script:
+
+```bash
+chmod +x ./build-and-package.sh
+./build-and-package.sh
+```
+
+This script performs the following actions:
+- Fixes permissions for the current directory.
+- Runs `npx prisma generate` to generate the Prisma client.
+- Installs project dependencies using `npm install`.
+- Builds the project using `npm run build`.
+- Executes all project tests using `npm test`.
+- Creates a `upload.zip` file containing only the essential files for deployment: `prisma/`, `src/`, `package.json`, `tsconfig.json`, and `.env.example`. This ensures a slim archive for upload.
+
+## 🚀 Deployment (DigitalOcean)
 
 1. Configure `.env` for production
 2. SSH into your Droplet and clone the repo

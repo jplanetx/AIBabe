@@ -16,7 +16,7 @@ export default function SignUpPage() {
   const handleSignUp = async (event: React.FormEvent) => {
     event.preventDefault();
     setMessage('');
-    console.log('Attempting sign up via API with:', { email, password });
+    console.log('Attempting sign up via API');
 
     try {
       const response = await fetch('/api/auth/register', {
