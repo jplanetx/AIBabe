@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-// import './onboarding-form.css'; // Add this line to include styles for the spinner
+import './onboarding-form.css'; // Add this line to include styles for the spinner
 import { supabase } from '../../lib/supabaseClients';
 
 export default function OnboardingForm() {
