@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { createClient } from '../../lib/supabaseClients';
+// import './onboarding-form.css'; // Add this line to include styles for the spinner
+import { supabase } from '../../lib/supabaseClients';
 
 export default function OnboardingForm() {
   const [name, setName] = useState('');
@@ -11,7 +12,6 @@ export default function OnboardingForm() {
   const simulateFormSubmission = async (name: string, email: string) => {
     setIsLoading(true);
     try {
-      const supabase = createClient();
       const { data, error } = await supabase.auth.signUp({
         email,
         password: 'TempPass123!',
@@ -59,7 +59,13 @@ export default function OnboardingForm() {
       </label>
       <br />
       <button type="submit" disabled={isLoading}>
-        {isLoading ? 'Creating account...' : 'Get Started'}
+        {isLoading ? (
+          <span>
+            <span className="spinner" /> Creating account...
+          </span>
+        ) : (
+          'Get Started'
+        )}
       </button>
     </form>
   );

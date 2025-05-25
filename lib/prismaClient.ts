@@ -1,4 +1,4 @@
-// lib/prisma.ts
+// lib/prismaClient.ts
 import { PrismaClient } from '@prisma/client';
 
 declare global {
@@ -6,10 +6,11 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
+// Reuse the client across hot-reloads in development
 export const prisma =
   global.prisma ||
-  new PrismaClient({
-    log: ['query'],
-  });
+  new PrismaClient();
 
-if (process.env.NODE_ENV !== 'production') global.prisma = prisma;
+if (process.env.NODE_ENV !== 'production') {
+  global.prisma = prisma;
+}

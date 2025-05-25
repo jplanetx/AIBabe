@@ -4,11 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npx prisma generate && next build",
+    "build": "next build",
     "start": "next start",
     "test:prod": "next build && next start",
     "test": "jest",
-    "prisma:migrate:dev": "npx dotenv -e .env.local -- npx prisma migrate dev"
+    "prisma:migrate:dev": "npx dotenv -e .env.local -- npx prisma migrate dev",
+    "prisma:generate": "npx prisma generate"
   },
   "dependencies": {
     "@hookform/resolvers": "3.9.0",
@@ -55,6 +56,7 @@
     "framer-motion": "^11.0.0",
     "lucide-react": "0.446.0",
     "next": "15.2.3",
+    "next-auth": "^4.24.11",
     "next-themes": "0.3.0",
     "openai": "^4.103.0",
     "postcss": "8.4.30",

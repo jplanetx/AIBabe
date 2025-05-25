@@ -27,10 +27,13 @@ COPY .env.local .env.local
 # 3) Copy the rest of your source
 COPY . .
 
-# 4) Run your combined build script (prisma + next)
+# 4) Generate Prisma client
+RUN npm run prisma:generate
+
+# 6) Run your combined build script (prisma + next)
 RUN npm run build
 
-# 5) Create a non-root user, fix permissions, and switch
+# 7) Create a non-root user, fix permissions, and switch
 RUN useradd -m appuser \
  && chown -R appuser:appuser /app
 USER appuser

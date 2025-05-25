@@ -1,10 +1,57 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db'; // Use the shared Prisma client
+import { prisma } from "@/lib/prisma";
+import { getServerSession } from "next-auth/next";
 
-// const prisma = new PrismaClient(); // Remove local instantiation
+/**
+ * GET handler: Fetch the user’s profile based on the session.
+ */
+export async function GET(request: Request) {
+  try {
+    const session = await getServerSession();
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
+    const user = await prisma.user.findUnique({
+      where: {
+        email: session.user.email as string,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        createdAt: true,
+        updatedAt: true,
+        subscription: true,
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(user);
+  } catch (error) {
+    console.error("Error fetching user profile:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * POST handler: Create the user's profile if it does not exist.
+ * This is the route tested in app/api/user/profile/route.test.ts
+ */
 export async function POST(request: Request) {
   try {
+    const session = await getServerSession();
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { userId, email } = await request.json();
 
     if (!userId || !email) {
@@ -12,7 +59,7 @@ export async function POST(request: Request) {
     }
 
     // Check if profile already exists
-    const existingProfile = await db.profile.findUnique({ // Use db instead of prisma
+    const existingProfile = await prisma.profile.findUnique({
       where: { id: userId },
     });
 
@@ -23,7 +70,7 @@ export async function POST(request: Request) {
       return NextResponse.json(existingProfile, { status: 200 });
     }
 
-    const newProfile = await db.profile.create({ // Use db instead of prisma
+    const newProfile = await prisma.profile.create({
       data: {
         id: userId,
         email: email,
@@ -34,10 +81,8 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error creating profile:', error);
     if (error instanceof Error) {
-        return NextResponse.json({ error: 'Failed to create profile', details: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create profile', details: error.message }, { status: 500 });
     }
     return NextResponse.json({ error: 'Failed to create profile', details: 'An unknown error occurred' }, { status: 500 });
-  } // finally { // No longer need to disconnect the shared client here
-    // await db.$disconnect();
-  // }
+  }
 }
