@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from "@/lib/prisma";
 import { getServerSession } from "next-auth/next";
 
+export const dynamic = 'force-dynamic';
+
 /**
  * GET handler: Fetch the user’s profile based on the session.
  */
