@@ -10,7 +10,7 @@ export async function GET(req: Request) {
 
     if (id) {
       // Get a specific character
-      const character = await prisma.character.findUnique({
+const character = await db.character.findUnique({
         where: {
           id,
         },
@@ -26,7 +26,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ character });
     } else {
       // Get all characters
-      const characters = await prisma.character.findMany({
+const characters = await db.character.findMany({
         orderBy: {
           name: "asc",
         },
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const character = await prisma.character.create({
+    const character = await db.character.create({
       data: {
         name,
         personality,

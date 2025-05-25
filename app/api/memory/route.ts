@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "lib/db";
 
 export async function GET(req: Request) {
   try {
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const memories = await prisma.memory.findMany({
+const memories = await db.memory.findMany({
       where: {
         userId,
         characterId,
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const memory = await prisma.memory.create({
+const memory = await db.memory.create({
       data: {
         userId,
         characterId,
@@ -86,7 +86,7 @@ export async function PUT(req: Request) {
     if (content !== undefined) updateData.content = content;
     if (importance !== undefined) updateData.importance = importance;
 
-    const memory = await prisma.memory.update({
+const memory = await db.memory.update({
       where: {
         id,
       },
@@ -115,7 +115,7 @@ export async function DELETE(req: Request) {
       );
     }
 
-    await prisma.memory.delete({
+await db.memory.delete({
       where: {
         id,
       },

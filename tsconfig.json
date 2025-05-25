@@ -26,12 +26,13 @@
       "./types",
       "./node_modules/@types"
     ],
+    "baseUrl": ".",
     "paths": {
       "@/*": [
         "./*"
       ],
-      "lib/*": [
-        "lib/*"
+      "./lib/*": [
+        "./lib/*"
       ]
     },
     "plugins": [

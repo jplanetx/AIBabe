@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await prisma.user.findUnique({
+const user = await db.user.findUnique({
       where: {
         email: session.user.email as string,
       },
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     }
 
     // Check if profile already exists
-    const existingProfile = await prisma.profile.findUnique({
+const existingProfile = await db.profile.findUnique({
       where: { id: userId },
     });
 
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       return NextResponse.json(existingProfile, { status: 200 });
     }
 
-    const newProfile = await prisma.profile.create({
+    const newProfile = await db.profile.create({
       data: {
         id: userId,
         email: email,

@@ -1,11 +1,11 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { db } from "lib/db";
 
 export async function GET() {
   try {
-    const personalities = await prisma.personality.findMany({
+const personalities = await db.personality.findMany({
       orderBy: {
         name: "asc",
       },
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const personality = await prisma.personality.create({
+const personality = await db.personality.create({
       data: {
         name,
         type,
