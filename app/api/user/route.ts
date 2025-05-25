@@ -1,9 +1,9 @@
+export const dynamic = 'force-dynamic';
+
 import { db } from "@/lib/db";
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-
-export const dynamic = "force-dynamic";
 
 // Define validation schema
 const userSchema = z.object({

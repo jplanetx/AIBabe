@@ -2,13 +2,16 @@ import os
 import re
 
 def find_route_imports(root_dir):
-    # Regex to match imports from app/api/.../route.ts or .js
     route_import_pattern = re.compile(
         r'import\s+.*\s+from\s+[\'"](.*/app/api/.*/route\.(ts|js))[\'"]'
     )
     found = []
+    exclude_dirs = {'node_modules', '.next', 'dist', 'out', 'build', '.git'}
 
-    for subdir, _, files in os.walk(root_dir):
+    for subdir, dirs, files in os.walk(root_dir):
+        # Modify dirs in-place to skip excluded directories
+        dirs[:] = [d for d in dirs if d not in exclude_dirs]
+
         for file in files:
             if file.endswith(('.ts', '.tsx', '.js', '.jsx')):
                 filepath = os.path.join(subdir, file)

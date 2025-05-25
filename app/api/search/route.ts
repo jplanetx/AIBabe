@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // app/api/search/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 // import { createSupabaseRouteHandlerClient } from '@/lib/supabaseClients'; // Example import
