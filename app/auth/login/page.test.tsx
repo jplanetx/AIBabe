@@ -3,10 +3,16 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import LoginPage from './page';
-import { createClient } from '@/lib/supabaseClients'; // Actual import
+// import { createClient } from '@/lib/supabaseClients'; // No longer directly used
+import { useRouter } from 'next/navigation'; // Already mocked
+
+// Mock global fetch
+global.fetch = jest.fn();
 
 // Mock Next.js router
 const mockPush = jest.fn();
+const mockRefresh = jest.fn(); // Added for router.refresh()
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
@@ -14,29 +20,32 @@ jest.mock('next/navigation', () => ({
     prefetch: jest.fn(),
     back: jest.fn(),
     forward: jest.fn(),
+    refresh: mockRefresh, // Added mock for refresh
   }),
 }));
 
-// Mock Supabase client
-jest.mock('@/lib/supabaseClients', () => ({
-  createClient: jest.fn(),
-}));
-
-const mockSupabaseClient = createClient as jest.Mock;
+// Remove Supabase client direct mock as component uses fetch
+// jest.mock('@/lib/supabaseClients', () => ({
+//   createClient: jest.fn(),
+// }));
+// const mockSupabaseClient = createClient as jest.Mock;
 
 describe('LoginPage', () => {
-  let mockSignInWithPassword: jest.Mock;
+  // let mockSignInWithPassword: jest.Mock; // No longer used
+  let mockFetch: jest.Mock;
 
   beforeEach(() => {
-    mockSignInWithPassword = jest.fn();
-    mockSupabaseClient.mockReturnValue({
-      auth: {
-        signInWithPassword: mockSignInWithPassword,
-      },
-    });
-    // Reset mocks before each test
-    mockSignInWithPassword.mockReset();
+    // mockSignInWithPassword = jest.fn(); // No longer used
+    // mockSupabaseClient.mockReturnValue({ // No longer used
+    //   auth: {
+    //     signInWithPassword: mockSignInWithPassword,
+    //   },
+    // });
+    
+    mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockReset();
     mockPush.mockClear();
+    mockRefresh.mockClear(); // Clear refresh mock
   });
 
   it('renders the login form', () => {
@@ -59,22 +68,25 @@ describe('LoginPage', () => {
     expect(passwordInput.value).toBe('password123');
   });
 
-  it('calls supabase.auth.signInWithPassword on form submission, displays success, and redirects', async () => {
-    mockSignInWithPassword.mockResolvedValueOnce({
-      data: { user: { id: '123', email: 'test@example.com' }, session: {} }, // Mock successful login
-      error: null,
-    });
+  it('calls /api/auth/login on form submission, displays success, and redirects', async () => {
+    const testEmail = 'test@example.com';
+    const testPassword = 'password123';
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValueOnce({ message: 'Login successful!', user: { id: 'user-123', email: testEmail } }),
+    } as unknown as Response);
 
     render(<LoginPage />);
 
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'test@example.com' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
     fireEvent.click(screen.getByRole('button', { name: /login/i }));
 
     await waitFor(() => {
-      expect(mockSignInWithPassword).toHaveBeenCalledWith({
-        email: 'test@example.com',
-        password: 'password123',
+      expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: testEmail, password: testPassword }),
       });
     });
 
@@ -83,26 +95,33 @@ describe('LoginPage', () => {
     });
     
     await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/chat');
+      expect(mockRefresh).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
     });
   });
 
-  it('displays an error message if login fails', async () => {
-    mockSignInWithPassword.mockResolvedValueOnce({
-      data: { user: null, session: null },
-      error: { message: 'Invalid login credentials' },
-    });
+  it('displays an error message if /api/auth/login call fails', async () => {
+    const testEmail = 'wrong@example.com';
+    const testPassword = 'wrongpassword';
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      statusText: 'Unauthorized',
+      json: jest.fn().mockResolvedValueOnce({ error: 'Invalid login credentials' }),
+    } as unknown as Response);
 
     render(<LoginPage />);
 
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'wrong@example.com' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'wrongpassword' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
     fireEvent.click(screen.getByRole('button', { name: /login/i }));
-
+    
     await waitFor(() => {
-      expect(mockSignInWithPassword).toHaveBeenCalledWith({
-        email: 'wrong@example.com',
-        password: 'wrongpassword',
+      expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: testEmail, password: testPassword }),
       });
     });
     
@@ -112,20 +131,40 @@ describe('LoginPage', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('displays a generic error if login returns no user, no session and no error', async () => {
-    mockSignInWithPassword.mockResolvedValueOnce({
-      data: { user: null, session: null },
-      error: null,
-    });
+  it('displays an error message if /api/auth/login call fails with details', async () => {
+    const testEmail = 'detailedfail@example.com';
+    const testPassword = 'password123';
+    const errorDetails = { code: 'AUTH_001', reason: 'Account locked' };
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      statusText: 'Forbidden',
+      json: jest.fn().mockResolvedValueOnce({ error: 'Access denied', details: errorDetails }),
+    } as unknown as Response);
 
     render(<LoginPage />);
-
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'test@example.com' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
     fireEvent.click(screen.getByRole('button', { name: /login/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Login attempt finished. Status unclear. Please try again or contact support.')).toBeInTheDocument();
+      expect(screen.getByText(`Login failed: ${JSON.stringify(errorDetails)}`)).toBeInTheDocument();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('displays a generic error message on network or unexpected error during login', async () => {
+    const testEmail = 'network@example.com';
+    const testPassword = 'password123';
+    mockFetch.mockRejectedValueOnce(new Error('Network failure'));
+
+    render(<LoginPage />);
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
+    fireEvent.click(screen.getByRole('button', { name: /login/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Login failed due to a network or unexpected error. Please try again.')).toBeInTheDocument();
     });
     expect(mockPush).not.toHaveBeenCalled();
   });

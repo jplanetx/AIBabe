@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { db } from '@/lib/db'; // Use the shared Prisma client
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient(); // Remove local instantiation
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     }
 
     // Check if profile already exists
-    const existingProfile = await prisma.profile.findUnique({
+    const existingProfile = await db.profile.findUnique({ // Use db instead of prisma
       where: { id: userId },
     });
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       return NextResponse.json(existingProfile, { status: 200 });
     }
 
-    const newProfile = await prisma.profile.create({
+    const newProfile = await db.profile.create({ // Use db instead of prisma
       data: {
         id: userId,
         email: email,
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to create profile', details: error.message }, { status: 500 });
     }
     return NextResponse.json({ error: 'Failed to create profile', details: 'An unknown error occurred' }, { status: 500 });
-  } finally {
-    await prisma.$disconnect();
-  }
+  } // finally { // No longer need to disconnect the shared client here
+    // await db.$disconnect();
+  // }
 }

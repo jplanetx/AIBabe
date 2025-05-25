@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { createClient } from '@/lib/supabaseClients';
+// import { createClient } from '@/lib/supabaseClients'; // No longer needed for direct Supabase calls here
 import { useRouter } from 'next/navigation';
 
 export default function SignUpPage() {
@@ -11,63 +11,42 @@ export default function SignUpPage() {
   const [message, setMessage] = useState('');
   const router = useRouter();
 
-  const supabase = createClient();
+  // const supabase = createClient(); // Supabase client initialized in API route
 
   const handleSignUp = async (event: React.FormEvent) => {
     event.preventDefault();
     setMessage('');
-    console.log('Attempting sign up with:', { email, password });
+    console.log('Attempting sign up via API with:', { email, password });
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`, // Or your desired callback URL
-      },
-    });
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (error) {
-      setMessage(`Sign up failed: ${error.message}`);
-      console.error('Sign up error:', error);
-    } else if (data.user && data.user.identities && data.user.identities.length === 0) {
-      // This case might indicate a user exists but is unconfirmed or some other edge case.
-      // Supabase might return a user object even if identities are empty if "Confirm email" is ON and user already exists.
-      setMessage('Sign up failed: User might already exist or an issue occurred.');
-      console.warn('Sign up warning: User object returned but identities array is empty.', data.user);
-    } else if (data.user) {
-      setMessage('Sign up successful! Please check your email to confirm your account. Creating profile...');
-      console.log('Sign up successful, user needs to confirm email:', data.user);
+      const data = await response.json();
 
-      // Create profile
-      try {
-        const profileResponse = await fetch('/api/user/profile', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ userId: data.user.id, email: data.user.email }),
-        });
+      if (!response.ok) {
+        // Handle errors from the API route
+        const errorDetails = data.details ? JSON.stringify(data.details) : data.error;
+        setMessage(`Sign up failed: ${errorDetails || response.statusText}`);
+        console.error('Sign up error from API:', data);
+      } else {
+        setMessage(data.message || 'Sign up successful! Please check your email to confirm your account.');
+        console.log('Sign up successful via API:', data);
+        // The profile creation logic is now part of the /api/auth/register if needed,
+        // or could be a subsequent step triggered by email confirmation.
+        // For now, we assume the API handles what's necessary post-signup.
 
-        if (!profileResponse.ok) {
-          const profileError = await profileResponse.json();
-          setMessage(`Sign up successful, but profile creation failed: ${profileError.error || profileResponse.statusText}. Please check your email to confirm your account.`);
-          console.error('Profile creation error:', profileError);
-        } else {
-          const newProfile = await profileResponse.json();
-          console.log('Profile created successfully:', newProfile);
-          setMessage('Sign up and profile creation successful! Please check your email to confirm your account.');
-        }
-      } catch (profileApiError) {
-        console.error('Error calling profile creation API:', profileApiError);
-        setMessage('Sign up successful, but profile creation failed. Please check your email to confirm your account.');
+        // Optionally, redirect or clear form here after a delay
+        // router.push('/auth/login'); // Or a page indicating to check email
       }
-
-      // Optionally, redirect or clear form here after a delay
-      // router.push('/auth/login'); // Or a page indicating to check email
-    } else {
-      // Fallback for unexpected response
-      setMessage('Sign up attempt finished. Status unclear. Please try again or contact support.');
-      console.warn('Sign up response unclear:', data);
+    } catch (error) {
+      console.error('Network or other error during sign up:', error);
+      setMessage('Sign up failed due to a network or unexpected error. Please try again.');
     }
   };
 

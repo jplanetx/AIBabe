@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { createClient } from '@/lib/supabaseClients';
+// import { createClient } from '@/lib/supabaseClients'; // No longer needed for direct Supabase calls here
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -11,29 +11,40 @@ export default function LoginPage() {
   const [message, setMessage] = useState('');
   const router = useRouter();
 
-  const supabase = createClient();
+  // const supabase = createClient(); // Supabase client initialized in API route
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
     setMessage('');
-    console.log('Attempting login with:', { email, password });
+    console.log('Attempting login via API with:', { email, password });
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    if (error) {
-      setMessage(`Login failed: ${error.message}`);
-      console.error('Login error:', error);
-    } else if (data.user) {
-      setMessage('Login successful!');
-      console.log('Login successful, user:', data.user);
-      router.push('/chat'); // Redirect to chat page on successful login
-    } else {
-      // Fallback for unexpected response
-      setMessage('Login attempt finished. Status unclear. Please try again or contact support.');
-      console.warn('Login response unclear:', data);
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle errors from the API route
+        const errorDetails = data.details ? JSON.stringify(data.details) : data.error;
+        setMessage(`Login failed: ${errorDetails || response.statusText}`);
+        console.error('Login error from API:', data);
+      } else {
+        setMessage(data.message || 'Login successful!');
+        console.log('Login successful via API, user:', data.user);
+        // router.push('/chat'); // Redirect to chat page on successful login
+        // Instead of push, we might want to refresh the page or let Supabase redirect based on session
+        router.refresh(); // This will re-fetch server components and update based on new cookie
+        router.push('/dashboard'); // Or any other protected page
+      }
+    } catch (error) {
+      console.error('Network or other error during login:', error);
+      setMessage('Login failed due to a network or unexpected error. Please try again.');
     }
   };
 

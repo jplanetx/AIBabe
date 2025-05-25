@@ -98,7 +98,7 @@ model ConversationSummary {
   id             String   @id @default(cuid())
   conversationId String   @unique // Foreign key to Conversation model, unique because one summary per convo
   summary        String   @db.Text // Use Text type for potentially long summaries
-  summarizedAt   DateTime // Timestamp of when the summary was generated
+  summarizedAt   DateTime @default(now()) // Timestamp of when the summary was generated
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

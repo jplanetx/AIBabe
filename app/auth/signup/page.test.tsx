@@ -16,34 +16,32 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
-// Mock Supabase client
-jest.mock('@/lib/supabaseClients', () => ({
-  createClient: jest.fn(),
-}));
+// Mock Supabase client - No longer needed for direct calls from this component
+// jest.mock('@/lib/supabaseClients', () => ({
+//   createClient: jest.fn(),
+// }));
 
-const mockSupabaseClient = createClient as jest.Mock;
+// const mockSupabaseClient = createClient as jest.Mock;
 
 // Mock global fetch
 global.fetch = jest.fn();
 
 describe('SignUpPage', () => {
- let mockSignUp: jest.Mock;
- let mockFetch: jest.Mock;
+  // let mockSignUp: jest.Mock; // No longer directly mocking supabase.auth.signUp here
+  let mockFetch: jest.Mock;
 
- beforeEach(() => {
-   mockSignUp = jest.fn();
-   mockSupabaseClient.mockReturnValue({
-     auth: {
-       signUp: mockSignUp,
-     },
-   });
-   mockFetch = global.fetch as jest.Mock;
-   // Reset mocks before each test
-   mockSignUp.mockReset();
-   mockFetch.mockReset();
- });
+  beforeEach(() => {
+    // mockSignUp = jest.fn(); // No longer needed
+    // mockSupabaseClient.mockReturnValue({ // No longer needed
+    //   auth: {
+    //     signUp: mockSignUp,
+    //   },
+    // });
+    mockFetch = global.fetch as jest.Mock;
+    mockFetch.mockReset();
+  });
 
- it('renders the sign up form', () => {
+  it('renders the sign up form', () => {
     render(<SignUpPage />);
     expect(screen.getByRole('heading', { name: /sign up/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
@@ -63,163 +61,97 @@ describe('SignUpPage', () => {
     expect(passwordInput.value).toBe('password123');
   });
 
-  it('calls supabase.auth.signUp and profile API on form submission and displays success message', async () => {
-    const testUser = { id: 'user-123', email: 'test@example.com', identities: [{ provider: 'email' }] };
-    mockSignUp.mockResolvedValueOnce({
-      data: { user: testUser },
-      error: null,
-    });
+  it('calls /api/auth/register on form submission and displays success message', async () => {
+    const testEmail = 'test@example.com';
+    const testPassword = 'password123';
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ id: testUser.id, email: testUser.email }),
-    } as Response);
+      status: 200,
+      json: jest.fn().mockResolvedValueOnce({ message: 'Sign up successful! Please check your email to confirm your account.' }),
+    } as unknown as Response);
  
     render(<SignUpPage />);
  
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testUser.email } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
     fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
  
     await waitFor(() => {
-      expect(mockSignUp).toHaveBeenCalledWith({
-        email: testUser.email,
-        password: 'password123',
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-    });
- 
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/user/profile', {
+      expect(mockFetch).toHaveBeenCalledWith('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: testUser.id, email: testUser.email }),
+        body: JSON.stringify({ email: testEmail, password: testPassword }),
       });
     });
  
     await waitFor(() => {
-      expect(screen.getByText('Sign up and profile creation successful! Please check your email to confirm your account.')).toBeInTheDocument();
+      expect(screen.getByText('Sign up successful! Please check your email to confirm your account.')).toBeInTheDocument();
     });
   });
 
-  it('displays an error message if profile creation API call fails after successful Supabase signup', async () => {
-    const testUser = { id: 'user-456', email: 'profilefail@example.com', identities: [{ provider: 'email' }] };
-    mockSignUp.mockResolvedValueOnce({
-      data: { user: testUser },
-      error: null,
-    });
+  it('displays an error message if /api/auth/register call fails (e.g. user already exists)', async () => {
+    const testEmail = 'existing@example.com';
+    const testPassword = 'password123';
     mockFetch.mockResolvedValueOnce({
       ok: false,
-      statusText: 'Internal Server Error',
-      json: async () => ({ error: 'Profile creation failed on server' }),
-    } as Response);
+      status: 409,
+      statusText: 'Conflict',
+      json: jest.fn().mockResolvedValueOnce({ error: 'User already exists' }),
+    } as unknown as Response);
 
     render(<SignUpPage />);
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testUser.email } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
+
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+    
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: testEmail, password: testPassword }),
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Sign up failed: User already exists')).toBeInTheDocument();
+    });
+  });
+
+  it('displays an error message if /api/auth/register call fails with details', async () => {
+    const testEmail = 'detailedfail@example.com';
+    const testPassword = 'password123';
+    const errorDetails = { field: 'email', issue: 'Invalid format' };
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      statusText: 'Bad Request',
+      json: jest.fn().mockResolvedValueOnce({ error: 'Validation failed', details: errorDetails }),
+    } as unknown as Response);
+
+    render(<SignUpPage />);
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
     fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/user/profile', expect.anything());
-    });
-
-    await waitFor(() => {
-      expect(screen.getByText('Sign up successful, but profile creation failed: Profile creation failed on server. Please check your email to confirm your account.')).toBeInTheDocument();
+      expect(screen.getByText(`Sign up failed: ${JSON.stringify(errorDetails)}`)).toBeInTheDocument();
     });
   });
 
-  it('displays an error message if profile creation API call throws a network error', async () => {
-    const testUser = { id: 'user-789', email: 'networkerror@example.com', identities: [{ provider: 'email' }] };
-    mockSignUp.mockResolvedValueOnce({
-      data: { user: testUser },
-      error: null,
-    });
+
+  it('displays an error message if /api/auth/register call throws a network error', async () => {
+    const testEmail = 'network@example.com';
+    const testPassword = 'password123';
     mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
     render(<SignUpPage />);
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testUser.email } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
+    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
     fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
-
-    await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalledWith('/api/user/profile', expect.anything());
-    });
     
     await waitFor(() => {
-      expect(screen.getByText('Sign up successful, but profile creation failed. Please check your email to confirm your account.')).toBeInTheDocument();
+      expect(screen.getByText('Sign up failed due to a network or unexpected error. Please try again.')).toBeInTheDocument();
     });
   });
- 
-  it('displays an error message if sign up fails (e.g. user already exists)', async () => {
-    mockSignUp.mockResolvedValueOnce({
-      data: { user: null }, // Or data: { user: { identities: [] } } if that's how Supabase indicates existing user
-      error: { message: 'User already registered' },
-    });
-
-    render(<SignUpPage />);
-
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'existing@example.com' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
-    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
-
-    await waitFor(() => {
-      expect(mockSignUp).toHaveBeenCalledWith({
-        email: 'existing@example.com',
-        password: 'password123',
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-    });
-    
-    await waitFor(() => {
-      expect(screen.getByText('Sign up failed: User already registered')).toBeInTheDocument();
-    });
-  });
-
-  it('displays a specific error message if user object is returned but identities array is empty', async () => {
-    mockSignUp.mockResolvedValueOnce({
-      data: { user: { id: '456', email: 'edgecase@example.com', identities: [] } }, // Empty identities array
-      error: null,
-    });
-  
-    render(<SignUpPage />);
-  
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'edgecase@example.com' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
-    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
-  
-    await waitFor(() => {
-      expect(mockSignUp).toHaveBeenCalledWith({
-        email: 'edgecase@example.com',
-        password: 'password123',
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-    });
-  
-    await waitFor(() => {
-      expect(screen.getByText('Sign up failed: User might already exist or an issue occurred.')).toBeInTheDocument();
-    });
-  });
-
-  it('displays a generic error if signup returns no user and no error', async () => {
-    mockSignUp.mockResolvedValueOnce({
-      data: { user: null },
-      error: null,
-    });
-
-    render(<SignUpPage />);
-
-    fireEvent.change(screen.getByLabelText(/email/i), { target: { value: 'test@example.com' } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'password123' } });
-    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Sign up attempt finished. Status unclear. Please try again or contact support.')).toBeInTheDocument();
-    });
-  });
-
 });

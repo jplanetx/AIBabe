@@ -46,7 +46,7 @@ describe('API Route: /api/user/profile', () => {
     expect(responseBody).toHaveProperty('email', email);
     expect(prismaMock.profile.findUnique).toHaveBeenCalledWith({ where: { id: userId } });
     expect(prismaMock.profile.create).toHaveBeenCalledWith({ data: { id: userId, email } });
-    expect(prismaMock.$disconnect).toHaveBeenCalledTimes(1);
+    
   });
 
   it('should return 400 if userId or email is missing', async () => {
@@ -69,7 +69,7 @@ describe('API Route: /api/user/profile', () => {
     const responseBody2 = await response2.json();
     expect(response2.status).toBe(400);
     expect(responseBody2.error).toBe('User ID and email are required');
-    expect(prismaMock.$disconnect).toHaveBeenCalledTimes(2); // Called in finally block for both requests
+    
   });
 
   it('should return 200 and existing profile if profile already exists', async () => {
@@ -92,7 +92,7 @@ describe('API Route: /api/user/profile', () => {
     expect(responseBody).toEqual(JSON.parse(JSON.stringify(existingProfileData))); // Compare JSON stringified versions due to Date objects
     expect(prismaMock.profile.findUnique).toHaveBeenCalledWith({ where: { id: userId } });
     expect(prismaMock.profile.create).not.toHaveBeenCalled();
-    expect(prismaMock.$disconnect).toHaveBeenCalledTimes(1);
+    
   });
 
   it('should return 500 if Prisma throws an error during findUnique', async () => {
@@ -114,7 +114,7 @@ describe('API Route: /api/user/profile', () => {
     expect(responseBody.error).toBe('Failed to create profile');
     expect(responseBody.details).toBe(errorMessage);
     expect(prismaMock.profile.create).not.toHaveBeenCalled();
-    expect(prismaMock.$disconnect).toHaveBeenCalledTimes(1);
+    
   });
 
   it('should return 500 if Prisma throws an error during create', async () => {
@@ -137,6 +137,6 @@ describe('API Route: /api/user/profile', () => {
     expect(response.status).toBe(500);
     expect(responseBody.error).toBe('Failed to create profile');
     expect(responseBody.details).toBe(errorMessage);
-    expect(prismaMock.$disconnect).toHaveBeenCalledTimes(1);
+    
   });
 });

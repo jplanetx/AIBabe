@@ -20,17 +20,8 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
-          // If the cookie is set, update the request and response cookies.
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
+          // The Supabase client will call this when it wants to set a cookie.
+          // We should set it on the outgoing response.
           response.cookies.set({
             name,
             value,
@@ -38,17 +29,8 @@ export async function middleware(request: NextRequest) {
           });
         },
         remove(name: string, options: CookieOptions) {
-          // If the cookie is removed, update the request and response cookies.
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
+          // The Supabase client will call this when it wants to remove a cookie.
+          // We should set an expired/empty cookie on the outgoing response.
           response.cookies.set({
             name,
             value: '',
@@ -68,7 +50,7 @@ export async function middleware(request: NextRequest) {
   // This is where you would implement your actual authentication checks.
   // For now, it allows all requests but logs the session status.
 
-  const protectedPaths = ['/dashboard', '/chat', '/api/user/profile']; // Add other paths that need protection
+  const protectedPaths = ['/dashboard', '/chat', '/api', '/me', '/settings', '/feedback']; // Add other paths that need protection
   const currentPath = request.nextUrl.pathname;
 
   if (protectedPaths.some(path => currentPath.startsWith(path))) {
