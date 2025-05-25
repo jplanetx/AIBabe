@@ -1,4 +1,4 @@
-import { UserPreference, ConversationSummary } from '@prisma/client';
+import { Prisma, UserPreference, ConversationSummary } from '@prisma/client';
 import { prisma } from './prisma'; // Use shared Prisma client
 
 // --- UserPreference CRUD ---

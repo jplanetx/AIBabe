@@ -42,28 +42,35 @@ function fixFile(filePath) {
     content = `${dynamicExport}\n\n${content}`;
   }
 
-  // Replace all prisma imports with import { db } from "@/lib/db";
-  // Remove any import of prisma client
-  content = content.replace(
-    /import\s+prisma\s+from\s+["'][^"']+["'];?/g,
-    ""
-  );
+// Replace all prisma imports with import { db } from "@/lib/db";
+ // Remove any import of prisma client
+ content = content.replace(
+   /import\s+prisma\s+from\s+["'][^"']+["'];?/g,
+   ""
+ );
 
-  // Ensure import { db } from "@/lib/db"; is present
-  if (!content.includes(`import { db } from "@/lib/db";`)) {
-    // Insert after first import or at top if no imports
-    const importRegex = /import .+ from .+;/;
-    const firstImportMatch = content.match(importRegex);
-    if (firstImportMatch) {
-      const idx = content.indexOf(firstImportMatch[0]) + firstImportMatch[0].length;
-      content =
-        content.slice(0, idx) +
-        `\nimport { db } from "@/lib/db";` +
-        content.slice(idx);
-    } else {
-      content = `import { db } from "@/lib/db";\n\n` + content;
-    }
-  }
+// Remove existing db imports from other paths
+content = content.replace(
+  /import\s+{\s*db\s*}\s+from\s+["'](?!@\/lib\/db["'])[^"']+["'];?\s*/g,
+  ""
+);
+
+// Ensure import { db } from "@/lib/db"; is present
+const hasDbUsage = /\bdb\./g.test(content);
+if (hasDbUsage && !content.includes(`import { db } from "@/lib/db";`)) {
+   // Insert after first import or at top if no imports
+   const importRegex = /import .+ from .+;/;
+   const firstImportMatch = content.match(importRegex);
+   if (firstImportMatch) {
+     const idx = content.indexOf(firstImportMatch[0]) + firstImportMatch[0].length;
+     content =
+       content.slice(0, idx) +
+       `\nimport { db } from "@/lib/db";` +
+       content.slice(idx);
+   } else {
+     content = `import { db } from "@/lib/db";\n\n` + content;
+   }
+ }
 
   // Replace all prisma. with db.
   content = content.replace(/\bprisma\./g, "db.");
@@ -97,16 +104,15 @@ function main() {
   });
   */
 
-  // Optional: Run next build and report
-  /*
-  console.log("\nRunning `npx next build` to verify...");
-  try {
-    execSync("npx next build", { stdio: "inherit" });
-    console.log("Build succeeded.");
-  } catch (e) {
-    console.error("Build failed. Please check errors above.");
-  }
-  */
+// Run next build and report
+ console.log("\nRunning `npx next build` to verify...");
+ try {
+   execSync("npx next build", { stdio: "inherit" });
+   console.log("Build succeeded.");
+ } catch (e) {
+   console.error("Build failed. Please check errors above.");
+  process.exit(1);
+ }
 }
 
 main();
