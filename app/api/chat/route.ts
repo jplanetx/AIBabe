@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 // app/api/chat/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from "@/lib/db";
 // import { createSupabaseRouteHandlerClient } from '@/lib/supabaseClients'; // Example import
 
 export async function GET(request: NextRequest) {

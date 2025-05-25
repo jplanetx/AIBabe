@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 // app/api/search/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { db } from "@/lib/db";
 // import { createSupabaseRouteHandlerClient } from '@/lib/supabaseClients'; // Example import
 // import { pineconeClient } from '@/lib/pineconeClient'; // Example import
 // import { openaiClient } from '@/lib/openaiClient'; // Example import
