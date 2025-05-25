@@ -1,31 +1,34 @@
 'use client';
 
 import React, { useState } from 'react';
-import { createClient } from '../libs/supabaseClients';
+import { createClient } from '../../lib/supabaseClients';
 
-const OnboardingForm = () => {
+export default function OnboardingForm() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const simulateFormSubmission = async (name: string, email: string) => {
-    const password = 'TempPass123!'; // temporary password for testing
+    setIsLoading(true);
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: 'TempPass123!',
+      });
 
-const supabase = createClient();
+      if (error) {
+        throw error;
+      }
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password
-  });
-
-    if (error) {
-      console.error('Signup error:', error.message);
-      alert('Signup failed: ' + error.message);
-      return;
+      console.log('Signup success:', data);
+      alert('Signup complete! Now try logging in.');
+    } catch (err: any) {
+      console.error('Signup error:', err.message);
+      alert('Signup failed: ' + err.message);
+    } finally {
+      setIsLoading(false);
     }
-
-    console.log('Signup success:', data);
-    alert('Signup complete! Now try logging in.');
-    // Optionally: move to next screen or store name
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -60,7 +63,4 @@ const supabase = createClient();
       </button>
     </form>
   );
-};
-
-export default OnboardingForm;
-export default OnboardingForm;
+}
