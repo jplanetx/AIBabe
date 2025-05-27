@@ -36,9 +36,27 @@ export default function LoginPage() {
       } else {
         setMessage(data.message || 'Login successful!');
         console.log('Login successful via API, user:', data.user);
-        // Redirect to chat page on successful login
-        router.refresh(); // This will re-fetch server components and update based on new cookie
-        router.push('/chat'); // Redirect to chat instead of dashboard
+        
+        // Check if user has completed onboarding
+        try {
+          const profileResponse = await fetch('/api/user/profile');
+          const profileData = await profileResponse.json();
+          
+          if (profileResponse.ok && profileData.success && profileData.data) {
+            // User has completed onboarding, redirect to chat
+            router.refresh();
+            router.push('/chat');
+          } else {
+            // User hasn't completed onboarding, redirect to onboarding
+            router.refresh();
+            router.push('/onboarding');
+          }
+        } catch (error) {
+          console.error('Error checking user profile:', error);
+          // Default to onboarding if we can't check profile
+          router.refresh();
+          router.push('/onboarding');
+        }
       }
     } catch (error) {
       console.error('Network or other error during login:', error);
@@ -68,7 +86,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Enter your email address"
               required
-              className="w-full p-3 mt-2 border-2 border-white border-opacity-20 rounded-lg bg-white bg-opacity-10 text-white text-base transition-all duration-300 ease-in-out focus:outline-none focus:border-pink-500 focus:bg-white focus:bg-opacity-15 focus:shadow-lg placeholder-white placeholder-opacity-60"
+              className="w-full p-3 mt-2 border-2 border-white border-opacity-20 rounded-lg bg-white bg-opacity-10 text-white text-base transition-all duration-300 ease-in-out focus:outline-none focus:border-pink-500 focus:bg-white focus:bg-opacity-15 focus:text-gray-900 focus:shadow-lg placeholder-white placeholder-opacity-60 focus:placeholder-gray-500"
             />
           </div>
           <div className="mb-6">
@@ -82,7 +100,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter your password"
               required
-              className="w-full p-3 mt-2 border-2 border-white border-opacity-20 rounded-lg bg-white bg-opacity-10 text-white text-base transition-all duration-300 ease-in-out focus:outline-none focus:border-pink-500 focus:bg-white focus:bg-opacity-15 focus:shadow-lg placeholder-white placeholder-opacity-60"
+              className="w-full p-3 mt-2 border-2 border-white border-opacity-20 rounded-lg bg-white bg-opacity-10 text-white text-base transition-all duration-300 ease-in-out focus:outline-none focus:border-pink-500 focus:bg-white focus:bg-opacity-15 focus:text-gray-900 focus:shadow-lg placeholder-white placeholder-opacity-60 focus:placeholder-gray-500"
             />
           </div>
           <button 

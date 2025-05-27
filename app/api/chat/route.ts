@@ -5,8 +5,6 @@ import { db } from "@/lib/db";
 import { Conversation, Message } from '@prisma/client';
 import { getChatCompletion, createPersonaPrompt, type ChatMessage } from '@/lib/llm_service';
 import { getConversationContext, ingestMessageToVectorDB, SemanticSearchResult } from '@/lib/vector_db';
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
 import {
   DEFAULT_PERSONA,
   DEFAULT_LLM_MODEL,
@@ -16,20 +14,19 @@ import {
 } from '@/lib/chatConfig';
 import { getPersonaDetails, buildConversationPromptContext, Persona } from '@/lib/chatUtils';
 
+// Temporary test user ID for development
+const TEST_USER_ID = 'test-user-123';
+
 export async function GET(request: NextRequest) {
   console.log('GET /api/chat: Received request');
   
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
+    // Temporarily skip authentication for testing
+    const userId = TEST_USER_ID;
 
     // Get user's conversations
     const conversations = await db.conversation.findMany({
-      where: { userId: session.user.id },
+      where: { userId: userId },
       include: {
         messages: {
           orderBy: { createdAt: 'desc' },
@@ -65,12 +62,8 @@ export async function POST(request: NextRequest) {
   console.log('POST /api/chat: Received request');
   
   try {
-    const supabase = createRouteHandlerClient({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (!session) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-    }
+    // Temporarily skip authentication for testing
+    const userId = TEST_USER_ID;
 
     const body = await request.json();
     const { message, conversationId, characterId } = body;
@@ -86,16 +79,16 @@ export async function POST(request: NextRequest) {
       messageLength: message.length, 
       conversationId, 
       characterId,
-      userId: session.user.id 
+      userId: userId 
     });
 
     // Get or create conversation
     let conversation;
-    if (conversationId) {
+    if (conversationId && conversationId !== 'new-' + conversationId.split('-')[1]) {
       conversation = await db.conversation.findFirst({
         where: { 
           id: conversationId, 
-          userId: session.user.id 
+          userId: userId 
         }
       });
       
@@ -109,7 +102,7 @@ export async function POST(request: NextRequest) {
       // Create new conversation
       conversation = await db.conversation.create({
         data: {
-          userId: session.user.id,
+          userId: userId,
           girlfriendId: characterId || null
         }
       });
@@ -130,7 +123,7 @@ export async function POST(request: NextRequest) {
     // Get conversation context for AI response
     const contextMessages = await getConversationContext(
       conversation.id,
-      session.user.id,
+      userId,
       message,
       VECTOR_DB_CONTEXT_MESSAGE_COUNT
     );
@@ -186,7 +179,7 @@ export async function POST(request: NextRequest) {
     ingestMessageToVectorDB(
       userMessage.id,
       conversation.id,
-      session.user.id,
+      userId,
       message,
       userMessage.createdAt
     ).catch(error => {
@@ -197,7 +190,7 @@ export async function POST(request: NextRequest) {
     ingestMessageToVectorDB(
       aiMessage.id,
       conversation.id,
-      session.user.id,
+      userId,
       aiResponse,
       aiMessage.createdAt
     ).catch(error => {

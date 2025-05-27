@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Heart, Menu, X, User, MessageCircle, CreditCard, LogIn, UserPlus } from "lucide-react";
+import { Heart, Menu, X, User, MessageCircle, CreditCard, LogIn, UserPlus, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,10 @@ import { cn } from "@/lib/utils";
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
+  const router = useRouter();
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -27,6 +30,38 @@ const Navbar = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    checkAuthStatus();
+  }, [pathname]);
+
+  const checkAuthStatus = async () => {
+    try {
+      const response = await fetch('/api/user/profile');
+      setIsAuthenticated(response.ok);
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      setIsAuthenticated(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+      
+      if (response.ok) {
+        setIsAuthenticated(false);
+        router.push('/');
+        router.refresh();
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
 
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
@@ -92,32 +127,60 @@ const Navbar = () => {
           </nav>
 
           <div className="hidden md:flex items-center justify-end md:flex-1 lg:w-0 space-x-4">
-            <Link
-              href="/auth/login"
-              className="text-gray-600 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400 inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors"
-            >
-              <LogIn className="h-4 w-4 mr-2" />
-              Login
-            </Link>
-            <Button
-              asChild
-              variant="outline"
-              className="border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20"
-            >
-              <Link href="/auth/signup">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Sign Up
-              </Link>
-            </Button>
-            <Button
-              asChild
-              variant="gradient"
-              className="ml-2 whitespace-nowrap"
-            >
-              <Link href="/subscription">
-                Upgrade Now
-              </Link>
-            </Button>
+            {!isLoading && (
+              <>
+                {isAuthenticated ? (
+                  <>
+                    <Button
+                      onClick={handleLogout}
+                      variant="outline"
+                      className="border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Logout
+                    </Button>
+                    <Button
+                      asChild
+                      variant="gradient"
+                      className="ml-2 whitespace-nowrap"
+                    >
+                      <Link href="/subscription">
+                        Upgrade Now
+                      </Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href="/auth/login"
+                      className="text-gray-600 dark:text-gray-300 hover:text-pink-600 dark:hover:text-pink-400 inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors"
+                    >
+                      <LogIn className="h-4 w-4 mr-2" />
+                      Login
+                    </Link>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20"
+                    >
+                      <Link href="/auth/signup">
+                        <UserPlus className="h-4 w-4 mr-2" />
+                        Sign Up
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="gradient"
+                      className="ml-2 whitespace-nowrap"
+                    >
+                      <Link href="/subscription">
+                        Upgrade Now
+                      </Link>
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -173,37 +236,68 @@ const Navbar = () => {
             </div>
           </div>
           <div className="py-6 px-5 space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <Button
-                asChild
-                variant="outline"
-                className="border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20"
-              >
-                <Link href="/auth/login" onClick={closeMenu}>
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Login
-                </Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20"
-              >
-                <Link href="/auth/signup" onClick={closeMenu}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Sign Up
-                </Link>
-              </Button>
-            </div>
-            <Button
-              asChild
-              variant="gradient"
-              className="w-full flex items-center justify-center"
-            >
-              <Link href="/subscription" onClick={closeMenu}>
-                Upgrade Now
-              </Link>
-            </Button>
+            {!isLoading && (
+              <>
+                {isAuthenticated ? (
+                  <>
+                    <Button
+                      onClick={() => {
+                        handleLogout();
+                        closeMenu();
+                      }}
+                      variant="outline"
+                      className="w-full border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20"
+                    >
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Logout
+                    </Button>
+                    <Button
+                      asChild
+                      variant="gradient"
+                      className="w-full flex items-center justify-center"
+                    >
+                      <Link href="/subscription" onClick={closeMenu}>
+                        Upgrade Now
+                      </Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20"
+                      >
+                        <Link href="/auth/login" onClick={closeMenu}>
+                          <LogIn className="h-4 w-4 mr-2" />
+                          Login
+                        </Link>
+                      </Button>
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20"
+                      >
+                        <Link href="/auth/signup" onClick={closeMenu}>
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Sign Up
+                        </Link>
+                      </Button>
+                    </div>
+                    <Button
+                      asChild
+                      variant="gradient"
+                      className="w-full flex items-center justify-center"
+                    >
+                      <Link href="/subscription" onClick={closeMenu}>
+                        Upgrade Now
+                      </Link>
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
           </div>
         </div>
       </motion.div>

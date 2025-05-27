@@ -124,7 +124,7 @@ export default function Home() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4 text-foreground">
                 Your Perfect <span className="gradient-text">AI Companion</span>
               </h1>
               <p className="text-lg md:text-xl mb-8 text-foreground/80">
@@ -167,7 +167,7 @@ export default function Home() {
             animate={inView1 ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
             transition={{ duration: 0.5 }}
           >
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-foreground">
               Features Designed for <span className="gradient-text">Connection</span>
             </h2>
             <p className="text-lg text-foreground/80 max-w-2xl mx-auto">

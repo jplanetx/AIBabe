@@ -1,126 +1,143 @@
-// app/chat/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import ConversationList from '@/components/chat/conversation-list';
-import MessageDisplay from '@/components/chat/message-display';
-import MessageInput from '@/components/chat/message-input';
-// import { createClient } from '@/lib/supabaseClients'; // Example import for Supabase
-
-// Define types for messages and conversations
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'ai' | 'system';
-  timestamp: Date;
-  conversationId: string;
-}
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Plus, MessageCircle, Clock } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 interface Conversation {
   id: string;
-  name: string;
   lastMessage: string;
   timestamp: Date;
-  unreadCount?: number;
+  messageCount: number;
 }
 
-// Mock data - replace with actual data fetching
-const mockConversations: Conversation[] = [
-  { id: 'conv1', name: 'General Chat', lastMessage: 'Sounds good!', timestamp: new Date(Date.now() - 1000 * 60 * 5), unreadCount: 2 },
-  { id: 'conv2', name: 'Support Query', lastMessage: 'I need help with...', timestamp: new Date(Date.now() - 1000 * 60 * 30) },
-  { id: 'conv3', name: 'Project Alpha', lastMessage: 'Meeting at 3 PM.', timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2) },
-];
-
-const mockMessages: Message[] = [
-  { id: 'msg1', conversationId: 'conv1', text: 'Hello there!', sender: 'ai', timestamp: new Date(Date.now() - 1000 * 60 * 7) },
-  { id: 'msg2', conversationId: 'conv1', text: 'Hi! How are you?', sender: 'user', timestamp: new Date(Date.now() - 1000 * 60 * 6) },
-  { id: 'msg3', conversationId: 'conv1', text: 'I am good, thanks! And you?', sender: 'ai', timestamp: new Date(Date.now() - 1000 * 60 * 5.5) },
-  { id: 'msg4', conversationId: 'conv1', text: 'Doing well. Sounds good!', sender: 'user', timestamp: new Date(Date.now() - 1000 * 60 * 5) },
-  { id: 'msg5', conversationId: 'conv2', text: 'I need help with my account.', sender: 'user', timestamp: new Date(Date.now() - 1000 * 60 * 30) },
-];
-
 export default function ChatPage() {
-  const [selectedConversationId, setSelectedConversationId] = useState<string | undefined>(mockConversations[0]?.id);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [conversations, setConversations] = useState<Conversation[]>(mockConversations);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
-  // const supabase = createClient(); // Example Supabase client
-
-  // Effect to load messages for the selected conversation
   useEffect(() => {
-    if (selectedConversationId) {
-      console.log(`Loading messages for conversation: ${selectedConversationId} (placeholder)`);
-      // Placeholder: Filter mock messages or fetch from backend
-      const currentConversationMessages = mockMessages.filter(msg => msg.conversationId === selectedConversationId);
-      setMessages(currentConversationMessages);
-    } else {
-      setMessages([]);
-    }
-  }, [selectedConversationId]);
+    fetchConversations();
+  }, []);
 
-  const handleSelectConversation = (conversationId: string) => {
-    setSelectedConversationId(conversationId);
-    // Optionally, mark conversation as read or perform other actions
-    console.log(`Selected conversation: ${conversationId}`);
+  const fetchConversations = async () => {
+    try {
+      const response = await fetch('/api/chat');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setConversations(data.data);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch conversations:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSendMessage = (messageText: string) => {
-    if (!selectedConversationId) {
-      console.warn('No conversation selected to send message to.');
-      // Potentially create a new conversation or prompt user to select one
-      alert("Please select a conversation first or implement new conversation logic.");
-      return;
+  const startNewChat = () => {
+    // Generate a temporary conversation ID for new chat
+    const newConversationId = `new-${Date.now()}`;
+    router.push(`/chat/${newConversationId}`);
+  };
+
+  const formatTime = (timestamp: Date) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+    
+    if (diffInHours < 1) {
+      return 'Just now';
+    } else if (diffInHours < 24) {
+      return `${Math.floor(diffInHours)}h ago`;
+    } else {
+      return date.toLocaleDateString();
     }
-    console.log(`Sending message to ${selectedConversationId}: ${messageText} (placeholder)`);
-    const newMessage: Message = {
-      id: `msg${Date.now()}`, // Temporary ID
-      conversationId: selectedConversationId,
-      text: messageText,
-      sender: 'user', // Assuming the user is sending
-      timestamp: new Date(),
-    };
-    setMessages(prevMessages => [...prevMessages, newMessage]);
-
-    // Placeholder: Simulate AI response
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: `msg${Date.now() + 1}`, // Temporary ID
-        conversationId: selectedConversationId,
-        text: `AI response to: "${messageText}" (placeholder)`,
-        sender: 'ai',
-        timestamp: new Date(),
-      };
-      setMessages(prevMessages => [...prevMessages, aiResponse]);
-    }, 1000);
-
-    // Update last message in conversation list (mock)
-    setConversations(prevConvs => prevConvs.map(conv => 
-        conv.id === selectedConversationId 
-        ? { ...conv, lastMessage: messageText, timestamp: new Date() } 
-        : conv
-    ));
   };
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 80px)', border: '1px solid #ccc', margin: '10px', borderRadius: '8px', overflow: 'hidden' }}>
-      <ConversationList
-        conversations={conversations}
-        selectedConversationId={selectedConversationId}
-        onSelectConversation={handleSelectConversation}
-      />
-      <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-        {selectedConversationId ? (
-          <>
-            <MessageDisplay messages={messages} />
-            <MessageInput onSendMessage={handleSendMessage} />
-          </>
-        ) : (
-          <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#777' }}>
-            <p>Select a conversation to start chatting.</p>
-          </div>
-        )}
-         <p style={{fontSize: '0.8em', color: 'gray', padding: '5px', textAlign: 'center', borderTop: '1px solid #eee'}}>Chat UI: Main Chat Page Placeholder ([`app/chat/page.tsx`](app/chat/page.tsx))</p>
+    <div className="container mx-auto max-w-4xl p-4">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Chat</h1>
+          <p className="text-muted-foreground">Connect with your AI girlfriend</p>
+        </div>
+        <Button onClick={startNewChat} className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          New Chat
+        </Button>
       </div>
+
+      {isLoading ? (
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="p-4 animate-pulse">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 bg-muted rounded-full"></div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-muted rounded w-3/4"></div>
+                  <div className="h-3 bg-muted rounded w-1/2"></div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : conversations.length > 0 ? (
+        <div className="space-y-4">
+          {conversations.map((conversation, index) => (
+            <motion.div
+              key={conversation.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Card className="p-4 hover:shadow-md transition-shadow cursor-pointer">
+                <Link href={`/chat/${conversation.id}`}>
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-purple-600 rounded-full flex items-center justify-center">
+                      <MessageCircle className="h-6 w-6 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-medium truncate">AI Girlfriend</h3>
+                        <div className="flex items-center text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {formatTime(conversation.timestamp)}
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {conversation.lastMessage}
+                      </p>
+                      <div className="flex items-center justify-between mt-2">
+                        <span className="text-xs text-muted-foreground">
+                          {conversation.messageCount} messages
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              </Card>
+            </motion.div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <MessageCircle className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h3 className="text-lg font-medium mb-2">No conversations yet</h3>
+          <p className="text-muted-foreground mb-6">
+            Start your first conversation with your AI girlfriend
+          </p>
+          <Button onClick={startNewChat} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Start New Chat
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
