@@ -37,6 +37,8 @@ export async function getChatCompletion(
   try {
     console.log("LLM_SERVICE_INFO: Sending request to OpenAI with", messages.length, "messages");
     console.log("LLM_SERVICE_INFO: Model:", model, "Temperature:", temperature, "Max tokens:", maxTokens);
+    console.log("LLM_SERVICE_DEBUG: API Key present:", !!process.env.OPENAI_API_KEY);
+    console.log("LLM_SERVICE_DEBUG: Messages preview:", JSON.stringify(messages.map(m => ({ role: m.role, contentLength: m.content.length })), null, 2));
 
     const completion = await openai.chat.completions.create({
       model,
@@ -45,17 +47,43 @@ export async function getChatCompletion(
       max_tokens: maxTokens,
     });
 
+    console.log("LLM_SERVICE_DEBUG: OpenAI response received:", {
+      choices: completion.choices?.length,
+      usage: completion.usage,
+      model: completion.model
+    });
+
     const response = completion.choices[0]?.message?.content;
     
     if (!response) {
+      console.error("LLM_SERVICE_ERROR: No response content in OpenAI response:", completion);
       throw new Error('No response content received from OpenAI');
     }
 
     console.log("LLM_SERVICE_INFO: Received response from OpenAI (length:", response.length, ")");
+    console.log("LLM_SERVICE_DEBUG: Response preview:", response.substring(0, 100) + "...");
     return response;
 
-  } catch (error) {
-    console.error("LLM_SERVICE_ERROR: Failed to get response from OpenAI:", error);
+  } catch (error: any) {
+    console.error("LLM_SERVICE_ERROR: Failed to get response from OpenAI:", {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      type: error.type,
+      stack: error.stack
+    });
+    
+    // Provide more specific error handling
+    if (error.status === 401) {
+      console.error("LLM_SERVICE_ERROR: Invalid API key");
+      return "I'm experiencing authentication issues. Please check the API configuration.";
+    } else if (error.status === 429) {
+      console.error("LLM_SERVICE_ERROR: Rate limit exceeded");
+      return "I'm currently experiencing high demand. Please try again in a moment.";
+    } else if (error.status >= 500) {
+      console.error("LLM_SERVICE_ERROR: OpenAI server error");
+      return "The AI service is temporarily unavailable. Please try again later.";
+    }
     
     // Return a fallback response instead of throwing
     return "I'm sorry, I'm having trouble responding right now. Please try again in a moment.";

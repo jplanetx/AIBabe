@@ -92,9 +92,9 @@ const ChatInterface = ({ conversationId }: ChatInterfaceProps) => {
 
     try {
       const requestBody = {
-        userId: "mockUserId", // Mock user ID
-        personalityId: conversation.id,
         message: currentNewMessage,
+        conversationId: conversationId,
+        characterId: conversation.id,
       };
       console.log("CHAT_UI_SENDING_REQUEST:", requestBody);
 
@@ -110,33 +110,17 @@ const ChatInterface = ({ conversationId }: ChatInterfaceProps) => {
         const data = await response.json();
         console.log("CHAT_UI_RECEIVED_RESPONSE_SUCCESS:", data);
         
-        setMessageCount(data.messageCount);
-        if (data.messageLimit) {
-          setMessageLimit(data.messageLimit);
-        }
-
-        if (data.limitReached) {
-          // The UI for limitReached is already handled by the component's main render logic
-          // based on messageCount and messageLimit. We just need to ensure these are set.
-          console.log("Message limit reached according to API.");
-        } else if (data.error_code) {
-          const errorMessage = data.message || "An API error occurred.";
-          console.log("CHAT_UI_DISPLAYING_ERROR (from data.error_code):", errorMessage);
-          setChatError(errorMessage);
-          // Optionally, remove the optimistically added user message if the API indicates a persistent error for it
-          // setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
-        } else if (data.aiMessage && data.aiMessage.text) {
+        if (data.success && data.data) {
           const aiMessage: Message = {
-            id: data.aiMessage.id || (Date.now() + 1).toString(),
-            content: data.aiMessage.text,
+            id: data.data.messageId || (Date.now() + 1).toString(),
+            content: data.data.reply,
             isUserMessage: false,
             timestamp: new Date(),
           };
           setMessages((prev) => [...prev, aiMessage]);
           setChatError(null);
         } else {
-          // Handle cases where AI message might be missing but no explicit error_code
-          const errorMessage = "Received an unexpected response from the server.";
+          const errorMessage = data.error || "Received an unexpected response from the server.";
           console.log("CHAT_UI_DISPLAYING_ERROR (unexpected response):", errorMessage);
           setChatError(errorMessage);
         }
