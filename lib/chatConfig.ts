@@ -1,4 +1,5 @@
 export const DEFAULT_PERSONA = {
+  id: null,
   name: "Emma",
   traits: [
     "warm and caring",

@@ -3,6 +3,7 @@ import { DEFAULT_PERSONA, LLM_CONTEXT_MESSAGE_COUNT } from '@/lib/chatConfig';
 import { SemanticSearchResult } from '@/lib/vector_db';
 
 export interface Persona {
+  id: string | null;
   name: string;
   traits: string[];
 }
@@ -18,20 +19,21 @@ export async function getPersonaDetails(characterId?: string): Promise<Persona> 
     return DEFAULT_PERSONA;
   }
   try {
-    const character = await db.character.findUnique({
+    const girlfriend = await db.girlfriend.findUnique({
       where: { id: characterId }
     });
     
-    if (character) {
+    if (girlfriend) {
       return {
-        name: character.name,
-        traits: character.personality ? 
-          character.personality.split(',').map((t: string) => t.trim()) :
+        id: girlfriend.id,
+        name: girlfriend.name,
+        traits: girlfriend.personality ? 
+          girlfriend.personality.split(',').map((t: string) => t.trim()) :
           DEFAULT_PERSONA.traits
       };
     }
   } catch (error) {
-    console.warn(`Failed to load character ${characterId}, using default persona:`, error);
+    console.warn(`Failed to load girlfriend ${characterId}, using default persona:`, error);
   }
   return DEFAULT_PERSONA;
 }

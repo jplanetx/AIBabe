@@ -7,10 +7,9 @@ import { cookies } from 'next/headers';
 import { z } from 'zod';
 
 const registerSchema = z.object({
+  name: z.string().min(2, { message: 'Name must be at least 2 characters long' }).optional(), // Made optional for now, can be required
   email: z.string().email({ message: 'Invalid email address' }),
   password: z.string().min(8, { message: 'Password must be at least 8 characters long' }),
-  // Add any other fields you expect during registration, e.g., name
-  // name: z.string().min(2, { message: 'Name must be at least 2 characters long' }),
 }).strict({ message: 'Unexpected fields in request' });
 
 export async function POST(request: NextRequest) {
@@ -52,7 +51,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { email, password } = validationResult.data;
+  const { name, email, password } = validationResult.data; // Destructure name as well
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -79,8 +78,7 @@ export async function POST(request: NextRequest) {
         data: {
           id: data.user.id, // Use the ID from Supabase Auth
           email: data.user.email,
-          // 'name' could come from validationResult.data if you add it to registerSchema
-          // name: validationResult.data.name, 
+          name: name, // Use the name from the validated request data
         },
       });
       console.log('User record created in public schema:', newUserInDb);

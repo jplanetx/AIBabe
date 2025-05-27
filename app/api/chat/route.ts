@@ -168,6 +168,8 @@ export async function POST(request: NextRequest) {
 
     // Get or create conversation
     let conversation;
+    let personaForNewConversation: Persona | null = null;
+
     if (conversationId && conversationId !== 'new-' + conversationId.split('-')[1]) {
       conversation = await db.conversation.findFirst({
         where: { 
@@ -183,14 +185,23 @@ export async function POST(request: NextRequest) {
         }, { status: 404 });
       }
     } else {
-      // Create new conversation
+      // For a new conversation, first get persona details to ensure characterId is valid
+      // or to get the ID of a default/selected character if characterId is a placeholder.
+      personaForNewConversation = await getPersonaDetails(characterId == null ? undefined : characterId);
+      
+      // Create new conversation using the ID from the fetched persona
       conversation = await db.conversation.create({
         data: {
-          userId: userId,
-          girlfriendId: characterId || null
+          userId: userId, // This sets the scalar field
+          user: {         // This connects the relation
+            connect: {
+              id: userId
+            }
+          },
+          girlfriendId: personaForNewConversation.id // Use the actual DB ID or null
         }
       });
-      console.log('POST /api/chat: Created new conversation:', conversation.id);
+      console.log('POST /api/chat: Created new conversation:', conversation.id, 'with girlfriendId:', personaForNewConversation.id);
     }
 
     // Save user message
@@ -213,9 +224,24 @@ export async function POST(request: NextRequest) {
     );
 
     // Get character/persona information
-    // If conversation exists, use its girlfriendId, otherwise use characterId from request (for new conv)
-    const effectiveCharacterId = conversation?.girlfriendId || characterId;
-    const persona: Persona = await getPersonaDetails(effectiveCharacterId);
+    let persona: Persona;
+    if (personaForNewConversation) {
+      persona = personaForNewConversation;
+    } else {
+      // Ensure conversation is defined here; it should be if personaForNewConversation is null
+      if (!conversation) {
+        // This case should ideally not be reached if logic is correct,
+        // but as a fallback, use default persona.
+        console.error("POST /api/chat: Conversation object is unexpectedly null when trying to get persona for existing conversation.");
+        persona = DEFAULT_PERSONA; 
+      } else {
+        const girlfriendIdFromConv = conversation.girlfriendId; // string | null
+        // Use nullish coalescing: if girlfriendIdFromConv is null, idForLookup becomes undefined.
+        // Otherwise, it's the string value.
+        const idForLookup = girlfriendIdFromConv ?? undefined; 
+        persona = await getPersonaDetails(idForLookup);
+      }
+    }
 
     // Build conversation context for AI
     const conversationContext = buildConversationPromptContext(contextMessages, message);
