@@ -1,5 +1,6 @@
 // File: lib/vector_db.ts
 import { prisma } from './prisma';
+import { Message } from '@prisma/client'; // Added import for Message type
 import { getEmbedding } from './llm_service';
 import { Pinecone } from '@pinecone-database/pinecone';
 
@@ -205,41 +206,6 @@ export async function ingestMessageToVectorDB(
 }
 
 /**
- * Triggers vector ingestion for a message by ID
- * @param messageId The ID of the newly saved message
- */
-export async function triggerVectorIngestionForMessage(messageId: string): Promise<void> {
-  try {
-    const message = await prisma.message.findUnique({
-      where: { id: messageId },
-      include: { conversation: true },
-    });
-
-    if (!message) {
-      console.error(`VECTOR_DB_ERROR: Message with ID ${messageId} not found`);
-      return;
-    }
-
-    if (!message.conversation || !message.conversation.userId) {
-      console.error(`VECTOR_DB_ERROR: Conversation or userId missing for message ID ${messageId}`);
-      return;
-    }
-    
-    // Ingest user messages for semantic search
-    // You might want to also ingest AI messages depending on use case
-    await ingestMessageToVectorDB(
-      message.id,
-      message.conversationId,
-      message.conversation.userId,
-      message.content,
-      message.createdAt
-    );
-  } catch (error) {
-    console.error(`VECTOR_DB_ERROR: Failed to trigger vector ingestion for message ${messageId}:`, error);
-  }
-}
-
-/**
  * Queries the vector DB for semantically similar messages
  * @param queryText The text to search for
  * @param userId The ID of the user to scope the search
@@ -336,7 +302,7 @@ export async function getConversationContext(
     const allResults = new Map<string, SemanticSearchResult>();
     
     // Add recent messages
-    recentMessages.forEach((msg: any) => {
+    recentMessages.forEach((msg: Message) => {
       allResults.set(msg.id, {
         id: msg.id,
         text: msg.content,

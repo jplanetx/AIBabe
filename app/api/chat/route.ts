@@ -4,22 +4,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from "@/lib/db";
 import { Conversation, Message } from '@prisma/client';
 import { getChatCompletion, createPersonaPrompt, type ChatMessage } from '@/lib/llm_service';
-import { getConversationContext, ingestMessageToVectorDB } from '@/lib/vector_db';
+import { getConversationContext, ingestMessageToVectorDB, SemanticSearchResult } from '@/lib/vector_db';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-
-// Default AI girlfriend persona
-const DEFAULT_PERSONA = {
-  name: "Emma",
-  traits: [
-    "warm and caring",
-    "playfully flirty",
-    "emotionally intelligent", 
-    "supportive and understanding",
-    "curious about your life",
-    "romantic and affectionate"
-  ]
-};
+import {
+  DEFAULT_PERSONA,
+  DEFAULT_LLM_MODEL,
+  DEFAULT_LLM_TEMPERATURE,
+  DEFAULT_LLM_MAX_TOKENS,
+  VECTOR_DB_CONTEXT_MESSAGE_COUNT
+} from '@/lib/chatConfig';
+import { getPersonaDetails, buildConversationPromptContext, Persona } from '@/lib/chatUtils';
 
 export async function GET(request: NextRequest) {
   console.log('GET /api/chat: Received request');
@@ -39,16 +34,19 @@ export async function GET(request: NextRequest) {
         messages: {
           orderBy: { createdAt: 'desc' },
           take: 1
+        },
+        _count: {
+          select: { messages: true }
         }
       },
       orderBy: { updatedAt: 'desc' }
     });
 
-    const chatHistory = conversations.map((conv: Conversation & { messages: Message[] }) => ({
+    const chatHistory = conversations.map((conv: Conversation & { messages: Message[], _count: { messages: number } }) => ({
       id: conv.id,
       lastMessage: conv.messages[0]?.content || "No messages yet",
       timestamp: conv.updatedAt,
-      messageCount: conv.messages.length
+      messageCount: conv._count.messages
     }));
 
     console.log('GET /api/chat: Responding with chat history');
@@ -112,8 +110,7 @@ export async function POST(request: NextRequest) {
       conversation = await db.conversation.create({
         data: {
           userId: session.user.id,
-          title: message.substring(0, 50) + (message.length > 50 ? '...' : ''),
-          characterId: characterId || null
+          girlfriendId: characterId || null
         }
       });
       console.log('POST /api/chat: Created new conversation:', conversation.id);
@@ -124,8 +121,7 @@ export async function POST(request: NextRequest) {
       data: {
         conversationId: conversation.id,
         content: message,
-        role: 'user',
-        userId: session.user.id
+        isUserMessage: true
       }
     });
 
@@ -136,43 +132,16 @@ export async function POST(request: NextRequest) {
       conversation.id,
       session.user.id,
       message,
-      10 // Get up to 10 context messages
+      VECTOR_DB_CONTEXT_MESSAGE_COUNT
     );
 
     // Get character/persona information
-    let persona = DEFAULT_PERSONA;
-    if (characterId) {
-      try {
-        const character = await db.character.findUnique({
-          where: { id: characterId }
-        });
-        
-        if (character) {
-          persona = {
-            name: character.name,
-            traits: character.personality ? 
-              character.personality.split(',').map((t: string) => t.trim()) :
-              DEFAULT_PERSONA.traits
-          };
-        }
-      } catch (error) {
-        console.warn('POST /api/chat: Failed to load character, using default persona:', error);
-      }
-    }
+    // If conversation exists, use its girlfriendId, otherwise use characterId from request (for new conv)
+    const effectiveCharacterId = conversation?.girlfriendId || characterId;
+    const persona: Persona = await getPersonaDetails(effectiveCharacterId);
 
     // Build conversation context for AI
-    let conversationContext = '';
-    if (contextMessages.length > 0) {
-      const recentContext = contextMessages
-        .slice(0, 5) // Use most recent 5 messages
-        .reverse() // Put in chronological order
-        .map(msg => `Previous: "${msg.text}"`)
-        .join('\n');
-      
-      conversationContext = `Recent conversation context:\n${recentContext}\n\nCurrent message: "${message}"`;
-    } else {
-      conversationContext = `This is the start of a new conversation. Current message: "${message}"`;
-    }
+    const conversationContext = buildConversationPromptContext(contextMessages, message);
 
     // Create system prompt with persona
     const systemPrompt = createPersonaPrompt(
@@ -190,9 +159,9 @@ export async function POST(request: NextRequest) {
     // Generate AI response
     console.log('POST /api/chat: Generating AI response...');
     const aiResponse = await getChatCompletion(aiMessages, {
-      model: 'gpt-3.5-turbo',
-      temperature: 0.8, // More creative for personality
-      maxTokens: 500
+      model: DEFAULT_LLM_MODEL,
+      temperature: DEFAULT_LLM_TEMPERATURE,
+      maxTokens: DEFAULT_LLM_MAX_TOKENS
     });
 
     // Save AI response
@@ -200,8 +169,7 @@ export async function POST(request: NextRequest) {
       data: {
         conversationId: conversation.id,
         content: aiResponse,
-        role: 'assistant',
-        userId: session.user.id
+        isUserMessage: false
       }
     });
 

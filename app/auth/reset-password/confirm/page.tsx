@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react'; // Added Suspense
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Eye, EyeOff } from 'lucide-react';
 
-export default function ResetPasswordConfirmPage() {
+// Define the inner component that uses useSearchParams
+function ResetPasswordConfirmForm() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -55,15 +56,20 @@ export default function ResetPasswordConfirmPage() {
     setError('');
     setMessage('');
 
+    const accessToken = searchParams.get('access_token');
+    const refreshToken = searchParams.get('refresh_token');
+
     try {
       const response = await fetch('/api/auth/update-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          password, 
-          confirmPassword 
+        body: JSON.stringify({
+          password,
+          confirmPassword,
+          access_token: accessToken,
+          refresh_token: refreshToken,
         }),
       });
 
@@ -223,5 +229,14 @@ export default function ResetPasswordConfirmPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// Define the default export page component that wraps the form with Suspense
+export default function ResetPasswordConfirmPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>Loading page...</p></div>}>
+      <ResetPasswordConfirmForm />
+    </Suspense>
   );
 }
