@@ -19,17 +19,26 @@ function ResetPasswordConfirmForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [isValidLink, setIsValidLink] = useState(true);
+  const [isValidLink, setIsValidLink] = useState(true); // Assume true initially, verify in useEffect
+  const [initialAccessToken, setInitialAccessToken] = useState<string | null>(null);
+  const [initialRefreshToken, setInitialRefreshToken] = useState<string | null>(null);
   
   const router = useRouter();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    // Check if we have the necessary URL parameters for password reset
     const accessToken = searchParams.get('access_token');
     const refreshToken = searchParams.get('refresh_token');
     
-    if (!accessToken || !refreshToken) {
+    if (accessToken && refreshToken) {
+      setInitialAccessToken(accessToken);
+      setInitialRefreshToken(refreshToken);
+      setIsValidLink(true);
+      // Clean the URL to remove tokens after they've been read
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    } else {
       setIsValidLink(false);
       setError('Invalid or expired reset link. Please request a new password reset.');
     }
@@ -38,7 +47,8 @@ function ResetPasswordConfirmForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!isValidLink) {
+    if (!isValidLink || !initialAccessToken || !initialRefreshToken) {
+      setError('Cannot submit form: Invalid link or tokens are missing.');
       return;
     }
 
@@ -56,8 +66,9 @@ function ResetPasswordConfirmForm() {
     setError('');
     setMessage('');
 
-    const accessToken = searchParams.get('access_token');
-    const refreshToken = searchParams.get('refresh_token');
+    // Use tokens from state, not from searchParams again
+    // const accessToken = searchParams.get('access_token');
+    // const refreshToken = searchParams.get('refresh_token');
 
     try {
       const response = await fetch('/api/auth/update-password', {
@@ -68,8 +79,8 @@ function ResetPasswordConfirmForm() {
         body: JSON.stringify({
           password,
           confirmPassword,
-          access_token: accessToken,
-          refresh_token: refreshToken,
+          access_token: initialAccessToken,
+          refresh_token: initialRefreshToken,
         }),
       });
 
@@ -91,7 +102,7 @@ function ResetPasswordConfirmForm() {
     }
   };
 
-  if (!isValidLink) {
+  if (!isValidLink && !initialAccessToken && !initialRefreshToken) { // Check if tokens were ever valid
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md">
@@ -132,6 +143,9 @@ function ResetPasswordConfirmForm() {
           <CardDescription className="text-center">
             Enter your new password below.
           </CardDescription>
+          <p className="text-xs text-muted-foreground text-center pt-1 px-6">
+            Remember: Password reset links are sensitive. Do not share them.
+          </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
