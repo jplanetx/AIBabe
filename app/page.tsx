@@ -131,7 +131,7 @@ export default function Home() {
                 Experience meaningful connections with AI companions designed to provide emotional support, engaging conversations, and personalized interactions.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Link href="/onboarding" className="btn-primary text-center">
+                <Link href="/auth/signup" className="btn-primary text-center">
                   Get Started
                 </Link>
                 <Link href="/personalities" className="btn-outline text-center">
@@ -401,7 +401,7 @@ export default function Home() {
             <p className="text-lg mb-8 text-white/80 max-w-2xl mx-auto">
               Start your journey today and experience meaningful connections like never before.
             </p>
-            <Link href="/onboarding" className="bg-white text-primary hover:bg-white/90 font-medium py-3 px-6 rounded-md transition-all duration-300 shadow-md hover:shadow-lg inline-block">
+            <Link href="/auth/signup" className="bg-white text-primary hover:bg-white/90 font-medium py-3 px-6 rounded-md transition-all duration-300 shadow-md hover:shadow-lg inline-block">
               Get Started Now
             </Link>
           </motion.div>

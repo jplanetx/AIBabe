@@ -13,16 +13,57 @@ import {
   VECTOR_DB_CONTEXT_MESSAGE_COUNT
 } from '@/lib/chatConfig';
 import { getPersonaDetails, buildConversationPromptContext, Persona } from '@/lib/chatUtils';
-
-// Temporary test user ID for development
-const TEST_USER_ID = 'test-user-123';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 export async function GET(request: NextRequest) {
   console.log('GET /api/chat: Received request');
   
+  const response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          response.cookies.set({ name, value, ...options });
+        },
+        remove(name: string, options: CookieOptions) {
+          response.cookies.set({ name, value: '', ...options });
+        },
+      },
+    }
+  );
+  
   try {
-    // Temporarily skip authentication for testing
-    const userId = TEST_USER_ID;
+    // Get authenticated user
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error('GET /api/chat: Error getting session:', sessionError);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Authentication error' 
+      }, { status: 500 });
+    }
+    
+    if (!session) {
+      console.log('GET /api/chat: No authenticated session');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Unauthorized - Please log in' 
+      }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    console.log('GET /api/chat: Authenticated user:', userId);
 
     // Get user's conversations
     const conversations = await db.conversation.findMany({
@@ -61,9 +102,52 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   console.log('POST /api/chat: Received request');
   
+  const response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          response.cookies.set({ name, value, ...options });
+        },
+        remove(name: string, options: CookieOptions) {
+          response.cookies.set({ name, value: '', ...options });
+        },
+      },
+    }
+  );
+  
   try {
-    // Temporarily skip authentication for testing
-    const userId = TEST_USER_ID;
+    // Get authenticated user
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error('POST /api/chat: Error getting session:', sessionError);
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Authentication error' 
+      }, { status: 500 });
+    }
+    
+    if (!session) {
+      console.log('POST /api/chat: No authenticated session');
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Unauthorized - Please log in' 
+      }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    console.log('POST /api/chat: Authenticated user:', userId);
 
     const body = await request.json();
     const { message, conversationId, characterId } = body;

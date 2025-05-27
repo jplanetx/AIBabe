@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import OnboardingForm from '@/components/onboarding/onboarding-form';
+import SignupForm from '@/components/auth/signup-form';
 
 export default function SignUpPage() {
   return (
@@ -12,7 +12,7 @@ export default function SignUpPage() {
           <p className="text-gray-300">Create your account to get started</p>
         </div>
         
-        <OnboardingForm />
+        <SignupForm />
       </div>
     </div>
   );

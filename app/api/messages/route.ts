@@ -1,17 +1,70 @@
 export const dynamic = 'force-dynamic';
 
 import { db } from "@/lib/db";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
-export async function GET(req: Request) {
+export async function GET(request: NextRequest) {
+  const response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          response.cookies.set({ name, value, ...options });
+        },
+        remove(name: string, options: CookieOptions) {
+          response.cookies.set({ name, value: '', ...options });
+        },
+      },
+    }
+  );
+
   try {
-    const { searchParams } = new URL(req.url);
+    // Get authenticated user
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error('GET /api/messages: Error getting session:', sessionError);
+      return NextResponse.json({ error: "Authentication error" }, { status: 500 });
+    }
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    const { searchParams } = new URL(request.url);
     const conversationId = searchParams.get("conversationId");
 
     if (!conversationId) {
       return NextResponse.json(
         { error: "Conversation ID is required" },
         { status: 400 }
+      );
+    }
+
+    // Verify user owns this conversation
+    const conversation = await db.conversation.findFirst({
+      where: {
+        id: conversationId,
+        userId: userId,
+      },
+    });
+
+    if (!conversation) {
+      return NextResponse.json(
+        { error: "Conversation not found or access denied" },
+        { status: 404 }
       );
     }
 
@@ -34,15 +87,67 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const { content, isUserMessage, userId, girlfriendId, conversationId } = body;
+export async function POST(request: NextRequest) {
+  const response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  });
 
-    if (!content || userId === undefined || !girlfriendId || !conversationId) {
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return request.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          response.cookies.set({ name, value, ...options });
+        },
+        remove(name: string, options: CookieOptions) {
+          response.cookies.set({ name, value: '', ...options });
+        },
+      },
+    }
+  );
+
+  try {
+    // Get authenticated user
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      console.error('POST /api/messages: Error getting session:', sessionError);
+      return NextResponse.json({ error: "Authentication error" }, { status: 500 });
+    }
+    
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized - Please log in" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    const body = await request.json();
+    const { content, isUserMessage, girlfriendId, conversationId } = body;
+
+    if (!content || !girlfriendId || !conversationId) {
       return NextResponse.json(
         { error: "Missing required fields" },
         { status: 400 }
+      );
+    }
+
+    // Verify user owns this conversation
+    const conversation = await db.conversation.findFirst({
+      where: {
+        id: conversationId,
+        userId: userId,
+      },
+    });
+
+    if (!conversation) {
+      return NextResponse.json(
+        { error: "Conversation not found or access denied" },
+        { status: 404 }
       );
     }
 
@@ -66,7 +171,9 @@ export async function POST(req: Request) {
       
       const messageCount = await db.message.count({
         where: {
-          userId,
+          conversation: {
+            userId: userId,
+          },
           isUserMessage: true,
           createdAt: {
             gte: today,
@@ -93,8 +200,6 @@ export async function POST(req: Request) {
       data: {
         content,
         isUserMessage,
-        userId,
-        girlfriendId,
         conversationId,
       },
     });
@@ -108,9 +213,10 @@ export async function POST(req: Request) {
         if (content.toLowerCase().includes(keyword)) {
           await db.memory.create({
             data: {
-              content,
-              importance: 3, // Medium importance
+              key: `memory_${keyword}`,
+              value: content,
               conversationId,
+              userId,
             },
           });
           break; // Only create one memory per message
