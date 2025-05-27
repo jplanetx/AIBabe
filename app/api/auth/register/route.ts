@@ -71,6 +71,41 @@ export async function POST(request: NextRequest) {
      return NextResponse.json({ error: 'User already exists or another issue occurred.' }, { status: 409 });
   }
 
+  // If Supabase sign-up was successful and we have a user object
+  if (data.user) {
+    try {
+      // Create a corresponding user in your public User table
+      const newUserInDb = await db.user.create({
+        data: {
+          id: data.user.id, // Use the ID from Supabase Auth
+          email: data.user.email,
+          // 'name' could come from validationResult.data if you add it to registerSchema
+          // name: validationResult.data.name, 
+        },
+      });
+      console.log('User record created in public schema:', newUserInDb);
+    } catch (dbError) {
+      console.error('Error creating user record in public schema:', dbError);
+      // Potentially, you might want to "undo" the Supabase auth user creation here if critical,
+      // or log this for manual intervention. For now, we'll return an error.
+      // await supabase.auth.admin.deleteUser(data.user.id); // Requires admin privileges
+      return NextResponse.json({ error: 'Registration succeeded but failed to create user profile. Please contact support.' }, { status: 500 });
+    }
+  } else if (!data.session) {
+    // This case might indicate that email confirmation is pending.
+    // The user object might still be in data.user but without a session.
+    // If data.user is null here, it's a more problematic issue.
+     console.warn('Supabase signUp returned no session and no user, email confirmation might be pending or an issue occurred.');
+     // Depending on your flow (e.g., if email confirmation is enabled and strictly required before DB entry)
+     // you might handle this differently. For now, we assume data.user should be present.
+     if (!data.user) {
+        return NextResponse.json({ error: 'Registration initiated but user data not available post-signup.' }, { status: 500 });
+     }
+      // If email confirmation is on, you might not create the public.User record here,
+      // but rather after the user confirms their email (e.g., in an /auth/callback route).
+      // For simplicity, if auto-confirm is off, this flow assumes the public.User is created immediately.
+  }
+
 
   // If sign up is successful, Supabase sends a confirmation email if enabled.
   // The session might not be immediately available; it's set after email confirmation or if auto-confirm is on.

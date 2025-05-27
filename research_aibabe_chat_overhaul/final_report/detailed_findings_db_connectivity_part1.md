@@ -29,6 +29,19 @@ This section compiles and elaborates on the primary findings related to resolvin
    - **Details:** Supabase enforces SSL connections for its databases. The connection string must reflect this, typically by appending `?sslmode=require`. Some platforms or local setups might require additional SSL certificate configurations if a direct (non-pooler) connection is attempted without proper SSL handling, though using the pooler URL with `sslmode=require` is the standard and recommended approach.
    - **Implication:** Always include `?sslmode=require` in the Supabase `DATABASE_URL`.
 
+## Key Finding 5: ISP-Specific Connectivity Issues & Pooler Workaround (T-Mobile Home Internet Case)
+   - **Source:** Direct troubleshooting session (May 27, 2025), `[research_aibabe_chat_overhaul/data_collection/primary_findings_part3.md](research_aibabe_chat_overhaul/data_collection/primary_findings_part3.md)` (to be created/updated with these details)
+   - **Details:** In a specific instance involving T-Mobile Home Internet, direct connections to the Supabase database URL (e.g., `db.project_ref.supabase.co` on port `5432`) failed. This manifested as:
+        *   DNS resolution failures for the direct database hostname.
+        *   Inability to connect to the direct database's IPv6 address.
+        *   The Supabase direct database connection is primarily IPv6 and may not be fully IPv4 compatible without specific add-ons or configurations, which can be problematic with certain ISP setups.
+   - **Workaround for `prisma migrate dev`:**
+        *   Temporarily change the `DATABASE_URL` in `.env.local` to use the Supabase **Session Pooler URL** (e.g., `postgresql://postgres.project_ref:[YOUR-PASSWORD]@aws-0-region.pooler.supabase.com:5432/postgres`). This pooler is IPv4 compatible.
+        *   Run `npx dotenv -e .env.local -- npx prisma migrate dev`. This command successfully connected and applied migrations using the Session Pooler.
+   - **Reverting for Application Runtime:**
+        *   After successful migration, revert the `DATABASE_URL` in `.env.local` back to the Supabase **Transaction Pooler URL** (e.g., `postgresql://postgres.project_ref:[YOUR-PASSWORD]@aws-0-region.pooler.supabase.com:6543/postgres`). This is the recommended URL for application runtime due to its efficiency in handling many short-lived connections.
+   - **Implication:** For users experiencing similar DNS/IPv6 connectivity issues with Supabase's direct database URL, particularly with ISPs like T-Mobile Home Internet, using the Session Pooler URL (port 5432) is a viable workaround for running Prisma migrations. The Transaction Pooler URL (port 6543) should still be used for the application itself. This requires a manual switch of the `DATABASE_URL` before and after running migrations.
+
 *(Further detailed findings will be added as research progresses.)*
 
 ### Citations (from `primary_findings_part1.md`):

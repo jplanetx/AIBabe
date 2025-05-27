@@ -153,7 +153,12 @@ export default function OnboardingForm() {
                       : 'border-border hover:border-primary/50'
                   }`}
                 >
-                  <h3 className="font-semibold">{option.label}</h3>
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-semibold">{option.label}</h3>
+                    {preferences.personalityType === option.id && (
+                      <span className="text-primary text-xl">✓</span>
+                    )}
+                  </div>
                   <p className="text-sm text-foreground/70 mt-1">{option.description}</p>
                 </div>
               ))}
@@ -190,7 +195,12 @@ export default function OnboardingForm() {
                       : 'border-border hover:border-primary/50'
                   }`}
                 >
-                  <h3 className="font-semibold">{option.label}</h3>
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-semibold">{option.label}</h3>
+                    {preferences.interactionStyle === option.id && (
+                      <span className="text-primary text-xl">✓</span>
+                    )}
+                  </div>
                   <p className="text-sm text-foreground/70 mt-1">{option.description}</p>
                 </div>
               ))}

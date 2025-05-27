@@ -32,20 +32,19 @@ export async function GET(request: NextRequest) {
   );
 
   try {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (sessionError) {
-      console.error("Error getting session:", sessionError);
+    if (authError || !user) {
+      console.error("Error getting user or no user:", authError);
       return NextResponse.json({ error: "Internal server error during session retrieval" }, { status: 500 });
     }
-    
-    if (!session) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const basicUser = await db.user.findUnique({
       where: {
-        id: session.user.id,
+        id: user.id,
       },
       select: {
         id: true,
@@ -64,7 +63,7 @@ export async function GET(request: NextRequest) {
     // Fetch UserProfile separately
     const userProfile = await db.userProfile.findUnique({
       where: {
-        userId: session.user.id,
+        userId: user.id,
       },
     });
 
@@ -114,55 +113,51 @@ export async function POST(request: NextRequest) { // Changed Request to NextReq
   );
 
   try {
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    if (sessionError) {
-      console.error("Error getting session for POST:", sessionError);
-      return NextResponse.json({ error: "Internal server error during session retrieval" }, { status: 500 });
+    if (authError || !user) {
+      console.error("Error getting user for POST or no user:", authError);
+      return NextResponse.json({ error: "Internal server error during user retrieval or user not found" }, { status: 500 });
     }
 
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    // Assuming userId and email for the new profile might come from the request body
-    // or could be derived from the session. For this example, let's assume they come from the body
-    // AND we ensure the operation is authorized by the current session user.
     const body = await request.json();
-    const { userId, email } = body; // Make sure these are validated and correspond to the session user if necessary
+    // Assuming the body directly contains the preferences payload for `profileData`
+    // and potentially other fields for UserProfile.
+    // For simplicity, let's assume `body` is the object to be stored in `profileData`.
 
-    // It's crucial to ensure that the user making the request is authorized to create/update this profile.
-    // For example, userId from body should match session.user.id
-    if (userId !== session.user.id) {
-      return NextResponse.json({ error: "Forbidden: You can only create your own profile." }, { status: 403 });
-    }
+    const userId = user.id; // Use the authenticated user's ID
 
-    if (!userId || !email) {
-      return NextResponse.json({ error: 'User ID and email are required' }, { status: 400 });
-    }
-
-    // Check if profile already exists
-const existingProfile = await db.profile.findUnique({
-      where: { id: userId },
+    // Check if UserProfile already exists
+    const existingUserProfile = await db.userProfile.findUnique({
+      where: { userId: userId },
     });
 
-    if (existingProfile) {
-      // Profile already exists, perhaps due to a retry or concurrent request.
-      // Log this and return success, as the desired state (profile exists) is met.
-      console.log(`Profile for user ${userId} already exists. Skipping creation.`);
-      return NextResponse.json(existingProfile, { status: 200 });
+    if (existingUserProfile) {
+      // UserProfile exists, update it
+      const updatedUserProfile = await db.userProfile.update({
+        where: { userId: userId },
+        data: {
+          profileData: JSON.stringify(body), // Store the entire body as a JSON string
+          lastUpdated: new Date(),
+          // Potentially update confidenceScore or other fields if applicable
+        },
+      });
+      console.log(`UserProfile for user ${userId} updated.`);
+      return NextResponse.json(updatedUserProfile, { status: 200 });
+    } else {
+      // UserProfile does not exist, create it
+      const newUserProfile = await db.userProfile.create({
+        data: {
+          userId: userId,
+          profileData: JSON.stringify(body), // Store the entire body as a JSON string
+          // Set default confidenceScore or other initial values if needed
+        },
+      });
+      console.log(`UserProfile for user ${userId} created.`);
+      return NextResponse.json(newUserProfile, { status: 201 });
     }
-
-    const newProfile = await db.profile.create({
-      data: {
-        id: userId,
-        email: email,
-      },
-    });
-
-    return NextResponse.json(newProfile, { status: 201 });
   } catch (error) {
-    console.error('Error creating profile:', error);
+    console.error('Error creating/updating UserProfile:', error);
     if (error instanceof Error) {
       return NextResponse.json({ error: 'Failed to create profile', details: error.message }, { status: 500 });
     }
