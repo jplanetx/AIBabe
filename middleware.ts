@@ -50,10 +50,19 @@ export async function middleware(request: NextRequest) {
   // This is where you would implement your actual authentication checks.
   // For now, it allows all requests but logs the session status.
 
-  const protectedPaths = ['/dashboard', '/chat', '/api', '/me', '/settings', '/feedback']; // Add other paths that need protection
+  const protectedPaths = ['/dashboard', '/chat', '/me', '/settings', '/feedback']; // Add other paths that need protection
+  const protectedApiPaths = ['/api/user', '/api/chat', '/api/conversations', '/api/memory', '/api/messages']; // API routes that need auth
+  const publicApiPaths = ['/api/auth', '/api/health']; // API routes that don't need auth
   const currentPath = request.nextUrl.pathname;
 
-  if (protectedPaths.some(path => currentPath.startsWith(path))) {
+  // Check if it's a protected API path (but not a public one)
+  const isProtectedApi = protectedApiPaths.some(path => currentPath.startsWith(path)) && 
+                         !publicApiPaths.some(path => currentPath.startsWith(path));
+
+  // Check if it's a protected regular path
+  const isProtectedPath = protectedPaths.some(path => currentPath.startsWith(path));
+
+  if (isProtectedPath || isProtectedApi) {
     if (!session) {
       console.log(`Middleware: Access to protected route ${currentPath} denied. Redirecting to login.`);
       // If no session and trying to access a protected route, redirect to login
@@ -83,8 +92,6 @@ export const config = {
      * - favicon.ico (favicon file)
      * Feel free to modify this pattern to include more paths.
      */
-    '/((?!_next/static|_next/image|favicon.ico|auth/.*).*)',
-    // Explicitly include API routes if needed, or adjust the negative lookahead
-    // '/api/:path*', // This would match all /api routes
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

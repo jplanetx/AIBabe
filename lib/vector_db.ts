@@ -1,110 +1,151 @@
 // File: lib/vector_db.ts
-import { prisma } from './prisma'; // Shared Prisma client
+import { prisma } from './prisma';
+import { getEmbedding } from './llm_service';
+import { Pinecone } from '@pinecone-database/pinecone';
 
-// --- Configuration Placeholders ---
-const PINECONE_API_KEY = process.env.PINECONE_API_KEY || "YOUR_PINECONE_API_KEY_PLACEHOLDER";
-const PINECONE_ENVIRONMENT = process.env.PINECONE_ENVIRONMENT || "YOUR_PINECONE_ENVIRONMENT_PLACEHOLDER";
+// --- Configuration ---
+const PINECONE_API_KEY = process.env.PINECONE_API_KEY;
 const PINECONE_INDEX_NAME = process.env.PINECONE_INDEX_NAME || "ai-babe-chat";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "YOUR_OPENAI_API_KEY_PLACEHOLDER";
-const EMBEDDING_MODEL = "text-embedding-ada-002"; // Example OpenAI model
-
-// --- Placeholder Pinecone Client ---
-interface PineconeVector {
+// --- Interfaces ---
+export interface PineconeVector {
   id: string;
   values: number[];
   metadata?: Record<string, any>;
 }
 
-interface UpsertResponse {
+export interface UpsertResponse {
   upsertedCount: number;
 }
 
-interface SemanticSearchResult {
+export interface SemanticSearchResult {
   id: string;
-  text: string; // Text content of the matched message/chunk
+  text: string;
   score: number;
   conversationId?: string;
   userId?: string;
   createdAt?: string;
 }
 
-// This is a mock Pinecone client. A real client would be imported from '@pinecone-database/pinecone'.
-const pineconeClientMock = {
-  index: (indexName: string) => ({
-    async upsert(vectors: PineconeVector[]): Promise<UpsertResponse> {
-      console.log(`VECTOR_DB_INFO: [Mock Pinecone] Upserting ${vectors.length} vectors to index '${indexName}'.`);
-      if (vectors.length > 0) {
-        vectors.forEach(v => console.log(`VECTOR_DB_INFO: [Mock Pinecone] Vector ID: ${v.id}, Metadata: ${JSON.stringify(v.metadata)}`));
-      }
-      // Simulate successful upsert
-      return { upsertedCount: vectors.length };
-    },
-    // Add other methods like query, delete as needed for TASK 3 Part 2
-    async query(queryRequest: { vector: number[], topK: number, includeMetadata?: boolean }): Promise<any> { // Refined signature
-      console.log(`VECTOR_DB_INFO: [Mock Pinecone] Querying index '${indexName}' with a vector (first 3 dims: ${queryRequest.vector.slice(0,3)}...). TopK: ${queryRequest.topK}`); // Refined logging
-      // Simulate some results
-      return {
-        matches: [
-          { id: "mockMatch1", score: 0.9, metadata: { text: "This is a mock search result." } },
-          { id: "mockMatch2", score: 0.8, metadata: { text: "Another similar mock result." } },
-        ]
-      };
+// --- Pinecone Client Initialization ---
+let pineconeClient: Pinecone | null = null;
+let pineconeIndex: any = null;
+
+async function initializePinecone() {
+  if (!pineconeClient && PINECONE_API_KEY) {
+    try {
+      pineconeClient = new Pinecone({
+        apiKey: PINECONE_API_KEY,
+      });
+      
+      pineconeIndex = pineconeClient.index(PINECONE_INDEX_NAME);
+      console.log("VECTOR_DB_INFO: Pinecone client initialized successfully");
+    } catch (error) {
+      console.error("VECTOR_DB_ERROR: Failed to initialize Pinecone:", error);
+      pineconeClient = null;
+      pineconeIndex = null;
     }
-  }),
-  // Simulate init
-  async init(config: { apiKey: string, environment: string }) {
-    console.log(`VECTOR_DB_INFO: [Mock Pinecone] Initializing with env: ${config.environment}.`);
-    // No-op for mock
+  }
+}
+
+// Initialize on module load
+initializePinecone();
+
+// --- Fallback Mock for Development ---
+const mockPineconeIndex = {
+  async upsert(vectors: PineconeVector[]): Promise<UpsertResponse> {
+    console.log(`VECTOR_DB_INFO: [Mock] Upserting ${vectors.length} vectors`);
+    return { upsertedCount: vectors.length };
+  },
+  
+  async query(queryRequest: { vector: number[], topK: number, includeMetadata?: boolean, filter?: any }): Promise<any> {
+    console.log(`VECTOR_DB_INFO: [Mock] Querying with topK: ${queryRequest.topK}`);
+    return {
+      matches: [
+        { 
+          id: "mock1", 
+          score: 0.9, 
+          metadata: { 
+            text: "This is a mock search result for development.",
+            conversationId: "conv1",
+            userId: "user1"
+          } 
+        },
+        { 
+          id: "mock2", 
+          score: 0.8, 
+          metadata: { 
+            text: "Another mock result to simulate semantic search.",
+            conversationId: "conv2", 
+            userId: "user1"
+          } 
+        },
+      ]
+    };
   }
 };
 
-// Initialize mock client (in a real app, this happens once)
-pineconeClientMock.init({ apiKey: PINECONE_API_KEY, environment: PINECONE_ENVIRONMENT });
-const pineconeIndex = pineconeClientMock.index(PINECONE_INDEX_NAME);
+// --- Helper Functions ---
 
-
-// --- Placeholder OpenAI Embedding Generation ---
 /**
- * Simulates generating embeddings for a text string.
- * In a real implementation, this would call the OpenAI API.
- * @param text The text to generate embeddings for.
- * @returns A promise that resolves to an array of numbers (embedding).
+ * Get the active Pinecone index (real or mock)
  */
-async function getOpenAiEmbedding(text: string): Promise<number[]> {
-  console.log(`VECTOR_DB_INFO: [Mock OpenAI] Generating embedding for text (length: ${text.length}): "${text.substring(0, 50)}..."`);
-  // Simulate an embedding. A real embedding would have many dimensions (e.g., 1536 for ada-002).
-  // For simplicity, using a small array.
-  if (!text || text.trim().length === 0) {
-    console.log("VECTOR_DB_INFO: [Mock OpenAI] Empty text received, returning empty embedding.");
-    return []; // Handle empty text
+function getIndex() {
+  if (pineconeIndex) {
+    return pineconeIndex;
   }
-  const embedding = Array(10).fill(0).map(() => Math.random()); // Dummy 10-dimensional embedding
-  console.log(`VECTOR_DB_INFO: [Mock OpenAI] Generated dummy embedding, first 3 dims: ${embedding.slice(0,3)}`);
-  return embedding;
+  console.log("VECTOR_DB_INFO: Using mock Pinecone index (no API key or initialization failed)");
+  return mockPineconeIndex;
 }
 
-// --- Data Ingestion Pipeline ---
-
 /**
- * Chunks text into smaller pieces if necessary.
- * For now, we'll treat each message as a single chunk.
- * @param messageText The text of the message.
- * @returns An array of text chunks.
+ * Chunks text into smaller pieces if necessary
+ * @param messageText The text of the message
+ * @returns An array of text chunks
  */
 function chunkText(messageText: string): string[] {
-  // Simple chunking: for now, each message is its own chunk.
-  // A more sophisticated approach might split long messages.
-  return [messageText];
+  // Simple chunking: for now, each message is its own chunk
+  // TODO: Implement more sophisticated chunking for long messages
+  if (!messageText || messageText.trim().length === 0) {
+    return [];
+  }
+  
+  // For messages longer than 1000 characters, we might want to chunk them
+  const maxChunkSize = 1000;
+  if (messageText.length <= maxChunkSize) {
+    return [messageText];
+  }
+  
+  // Simple sentence-based chunking
+  const sentences = messageText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const chunks: string[] = [];
+  let currentChunk = '';
+  
+  for (const sentence of sentences) {
+    if (currentChunk.length + sentence.length > maxChunkSize && currentChunk.length > 0) {
+      chunks.push(currentChunk.trim());
+      currentChunk = sentence;
+    } else {
+      currentChunk += (currentChunk ? '. ' : '') + sentence;
+    }
+  }
+  
+  if (currentChunk.trim().length > 0) {
+    chunks.push(currentChunk.trim());
+  }
+  
+  return chunks.length > 0 ? chunks : [messageText];
 }
 
+// --- Main Functions ---
+
 /**
- * Prepares and upserts a message to the vector DB.
- * @param messageId The ID of the message.
- * @param conversationId The ID of the conversation.
- * @param userId The ID of the user (owner of the conversation).
- * @param messageText The text of the message.
- * @param messageTimestamp The timestamp of the message.
+ * Prepares and upserts a message to the vector DB
+ * @param messageId The ID of the message
+ * @param conversationId The ID of the conversation
+ * @param userId The ID of the user
+ * @param messageText The text of the message
+ * @param messageTimestamp The timestamp of the message
  */
 export async function ingestMessageToVectorDB(
   messageId: string,
@@ -115,123 +156,134 @@ export async function ingestMessageToVectorDB(
 ): Promise<void> {
   try {
     console.log(`VECTOR_DB_INFO: Starting ingestion for messageId: ${messageId}`);
+    
     const textChunks = chunkText(messageText);
-    if (textChunks.length === 0 || textChunks[0].trim().length === 0) {
-        console.log(`VECTOR_DB_INFO: Skipping ingestion for messageId ${messageId} as it's empty after chunking.`);
-        return;
+    if (textChunks.length === 0) {
+      console.log(`VECTOR_DB_INFO: Skipping ingestion for messageId ${messageId} - no valid chunks`);
+      return;
     }
 
-    for (const chunk of textChunks) {
-      if (chunk.trim().length === 0) {
-        console.warn(`VECTOR_DB_WARN: Skipping upsert for an empty chunk from messageId ${messageId}.`);
-        continue; // Skip empty chunks
-      }
+    const index = getIndex();
+    const vectors: PineconeVector[] = [];
 
-      const embedding = await getOpenAiEmbedding(chunk);
-      if (embedding.length === 0) {
-          console.warn(`VECTOR_DB_WARN: Skipping upsert for a chunk from messageId ${messageId} due to empty embedding.`);
-          continue;
-      }
-
-      const vector: PineconeVector = {
-        id: messageId, // Using messageId as the vector ID. If chunking, might need messageId + chunkIndex.
-        values: embedding,
-        metadata: {
-          conversationId,
-          userId,
-          text: chunk, // Store the original text chunk for context
-          createdAt: messageTimestamp.toISOString(),
-        },
-      };
+    for (let i = 0; i < textChunks.length; i++) {
+      const chunk = textChunks[i];
       
-      // In a real scenario, you might batch upserts.
-      const upsertResult = await pineconeIndex.upsert([vector]);
-      console.log(`VECTOR_DB_INFO: Upsert result for messageId ${messageId}:`, upsertResult);
+      try {
+        const embedding = await getEmbedding(chunk);
+        
+        const vectorId = textChunks.length === 1 ? messageId : `${messageId}_chunk_${i}`;
+        
+        const vector: PineconeVector = {
+          id: vectorId,
+          values: embedding,
+          metadata: {
+            conversationId,
+            userId,
+            text: chunk,
+            messageId,
+            chunkIndex: i,
+            totalChunks: textChunks.length,
+            createdAt: messageTimestamp.toISOString(),
+          },
+        };
+        
+        vectors.push(vector);
+      } catch (error) {
+        console.error(`VECTOR_DB_ERROR: Failed to generate embedding for chunk ${i} of message ${messageId}:`, error);
+      }
     }
+
+    if (vectors.length > 0) {
+      const upsertResult = await index.upsert(vectors);
+      console.log(`VECTOR_DB_INFO: Successfully upserted ${vectors.length} vectors for messageId ${messageId}`);
+    }
+
   } catch (error) {
     console.error(`VECTOR_DB_ERROR: Failed to ingest message ${messageId} to Vector DB:`, error);
   }
 }
 
 /**
- * Example function to be called from elsewhere (e.g., after a message is saved).
- * This function would fetch necessary details if not passed directly.
- * For now, it's a placeholder for where the ingestion logic would be triggered.
- * @param messageId The ID of the newly saved message.
+ * Triggers vector ingestion for a message by ID
+ * @param messageId The ID of the newly saved message
  */
 export async function triggerVectorIngestionForMessage(messageId: string): Promise<void> {
-  const message = await prisma.message.findUnique({
-    where: { id: messageId },
-    include: { conversation: true }, // To get userId and conversationId
-  });
+  try {
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      include: { conversation: true },
+    });
 
-  if (!message) {
-    console.error(`VECTOR_DB_ERROR: Message with ID ${messageId} not found for vector ingestion.`);
-    return;
-  }
+    if (!message) {
+      console.error(`VECTOR_DB_ERROR: Message with ID ${messageId} not found`);
+      return;
+    }
 
-  if (!message.conversation || !message.conversation.userId) {
-    console.error(`VECTOR_DB_ERROR: Conversation or userId missing for message ID ${messageId}.`);
-    return;
+    if (!message.conversation || !message.conversation.userId) {
+      console.error(`VECTOR_DB_ERROR: Conversation or userId missing for message ID ${messageId}`);
+      return;
+    }
+    
+    // Ingest user messages for semantic search
+    // You might want to also ingest AI messages depending on use case
+    await ingestMessageToVectorDB(
+      message.id,
+      message.conversationId,
+      message.conversation.userId,
+      message.content,
+      message.createdAt
+    );
+  } catch (error) {
+    console.error(`VECTOR_DB_ERROR: Failed to trigger vector ingestion for message ${messageId}:`, error);
   }
-  
-  // We only want to ingest user messages for semantic search of their past interactions.
-  // Or, we might want to ingest AI messages too, depending on the use case.
-  // For now, let's assume we ingest all messages.
-  await ingestMessageToVectorDB(
-    message.id,
-    message.conversationId,
-    message.conversation.userId,
-    message.content, // 'text' field in Message model is 'content'
-    message.createdAt
-  );
 }
 
 /**
- * Queries the vector DB for semantically similar messages.
- * @param queryText The text to search for.
- * @param userId The ID of the user, to potentially scope the search.
- * @param topK The number of similar results to return.
- * @returns A promise that resolves to an array of SemanticSearchResult objects.
+ * Queries the vector DB for semantically similar messages
+ * @param queryText The text to search for
+ * @param userId The ID of the user to scope the search
+ * @param topK The number of similar results to return
+ * @param conversationId Optional conversation ID to filter results
+ * @returns A promise that resolves to an array of SemanticSearchResult objects
  */
 export async function queryVectorDB(
   queryText: string,
-  userId: string, // Added userId for potential filtering, though mock doesn't use it yet
-  topK: number = 3
+  userId: string,
+  topK: number = 5,
+  conversationId?: string
 ): Promise<SemanticSearchResult[]> {
   try {
     if (!queryText || queryText.trim().length === 0) {
-      console.log("VECTOR_DB_INFO: [Query] Empty query text, returning no results.");
+      console.log("VECTOR_DB_INFO: Empty query text, returning no results");
       return [];
     }
 
-    console.log(`VECTOR_DB_INFO: [Query] Generating embedding for query: "${queryText.substring(0,50)}..."`);
-    const queryEmbedding = await getOpenAiEmbedding(queryText);
-
-    if (queryEmbedding.length === 0) {
-      console.log("VECTOR_DB_INFO: [Query] Failed to generate embedding for query, returning no results.");
-      return [];
+    console.log(`VECTOR_DB_INFO: Querying for: "${queryText.substring(0, 50)}..." (userId: ${userId})`);
+    
+    const queryEmbedding = await getEmbedding(queryText);
+    const index = getIndex();
+    
+    // Build filter for user-specific search
+    const filter: any = { userId };
+    if (conversationId) {
+      filter.conversationId = conversationId;
     }
     
-    // In a real Pinecone query, you might use filters e.g., filter: { userId: userId }
-    // The mock query function in pineconeIndex doesn't currently support filters,
-    // but we pass userId to show intent.
-    console.log(`VECTOR_DB_INFO: [Query] Querying Pinecone index with topK=${topK} for userId=${userId} (userId not used by mock).`);
-    const queryResponse = await pineconeIndex.query({
+    const queryResponse = await index.query({
       vector: queryEmbedding,
-      topK: topK,
+      topK,
       includeMetadata: true,
-      // filter: { userId: userId } // Example of how filtering might look
-      // The mock implementation of query in pineconeClientMock needs to handle this if we want to test filtering
-      // For now, the mock query returns fixed results.
+      filter: pineconeIndex ? filter : undefined, // Only use filter with real Pinecone
     });
 
     if (!queryResponse || !queryResponse.matches) {
-      console.log("VECTOR_DB_INFO: [Query] No matches found or invalid response from vector DB.");
+      console.log("VECTOR_DB_INFO: No matches found");
       return [];
     }
 
-    console.log(`VECTOR_DB_INFO: [Query] Received ${queryResponse.matches.length} matches from vector DB.`);
+    console.log(`VECTOR_DB_INFO: Found ${queryResponse.matches.length} semantic matches`);
+    
     const results: SemanticSearchResult[] = queryResponse.matches.map((match: any) => ({
       id: match.id,
       text: match.metadata?.text || "",
@@ -244,7 +296,80 @@ export async function queryVectorDB(
     return results;
 
   } catch (error) {
-    console.error("VECTOR_DB_ERROR: [Query] Failed to query Vector DB:", error);
-    return []; // Return empty array on error
+    console.error("VECTOR_DB_ERROR: Failed to query Vector DB:", error);
+    return [];
+  }
+}
+
+/**
+ * Retrieves conversation context by finding recent and relevant messages
+ * @param conversationId The conversation ID
+ * @param userId The user ID
+ * @param currentMessage Optional current message for semantic similarity
+ * @param maxMessages Maximum number of messages to retrieve
+ * @returns Array of relevant messages for context
+ */
+export async function getConversationContext(
+  conversationId: string,
+  userId: string,
+  currentMessage?: string,
+  maxMessages: number = 10
+): Promise<SemanticSearchResult[]> {
+  try {
+    // Get recent messages from the conversation
+    const recentMessages = await prisma.message.findMany({
+      where: {
+        conversationId,
+        conversation: { userId }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: maxMessages,
+    });
+
+    // If we have a current message, also get semantically similar messages
+    let semanticResults: SemanticSearchResult[] = [];
+    if (currentMessage && currentMessage.trim().length > 0) {
+      semanticResults = await queryVectorDB(currentMessage, userId, 5, conversationId);
+    }
+
+    // Combine and deduplicate results
+    const allResults = new Map<string, SemanticSearchResult>();
+    
+    // Add recent messages
+    recentMessages.forEach((msg: any) => {
+      allResults.set(msg.id, {
+        id: msg.id,
+        text: msg.content,
+        score: 1.0, // High score for recent messages
+        conversationId: msg.conversationId,
+        userId,
+        createdAt: msg.createdAt.toISOString(),
+      });
+    });
+    
+    // Add semantic results (they might overlap with recent messages)
+    semanticResults.forEach(result => {
+      if (!allResults.has(result.id)) {
+        allResults.set(result.id, result);
+      }
+    });
+
+    // Convert to array and sort by relevance (score) and recency
+    const contextMessages = Array.from(allResults.values())
+      .sort((a, b) => {
+        // Prioritize by score first, then by recency
+        if (Math.abs(a.score - b.score) > 0.1) {
+          return b.score - a.score;
+        }
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      })
+      .slice(0, maxMessages);
+
+    console.log(`VECTOR_DB_INFO: Retrieved ${contextMessages.length} context messages for conversation ${conversationId}`);
+    return contextMessages;
+
+  } catch (error) {
+    console.error("VECTOR_DB_ERROR: Failed to get conversation context:", error);
+    return [];
   }
 }

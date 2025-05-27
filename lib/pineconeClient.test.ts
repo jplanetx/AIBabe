@@ -56,25 +56,32 @@ beforeEach(() => {
     }
 
     getPineconeClientModule = require('./pineconeClient');
-   });
-      const newMockCreateIndex = jest.fn();
-      const newMockDescribeIndex = jest.fn().mockResolvedValue({ name: 'test-index', status: { ready: true } });
-      const newMockListIndexes = jest.fn().mockResolvedValue({ indexes: [] });
-      const newMockIndexObject = { // Simulating the object returned by client.index('index-name')
-        namespace: jest.fn().mockReturnThis(),
-        // Add other index methods if they were part of the original mockIndex or needed
-      };
-      const newMockIndexMethod = jest.fn().mockImplementation(() => newMockIndexObject);
-      
-      const constructorMock = jest.fn().mockImplementation(() => ({
-        init: newMockInit,
-        index: newMockIndexMethod,
-        createIndex: newMockCreateIndex,
-        describeIndex: newMockDescribeIndex,
-        listIndexes: newMockListIndexes,
+    // The premature }); from original line 59 was removed by this diff.
+    // Mock functions are initialized here for each test run and captured by the jest.doMock factory.
+    // 'newMockInit' is a 'let' declared at line 37; it's reassigned here for test isolation.
+    newMockInit = jest.fn();
+    const localNewMockCreateIndex = jest.fn(); // These are local to this beforeEach scope
+    const localNewMockDescribeIndex = jest.fn().mockResolvedValue({ name: 'test-index', status: { ready: true } });
+    const localNewMockListIndexes = jest.fn().mockResolvedValue({ indexes: [] });
+    const localNewMockIndexObject = {
+      namespace: jest.fn().mockReturnThis(),
+    };
+    const localNewMockIndexMethod = jest.fn().mockImplementation(() => localNewMockIndexObject);
+    
+    jest.doMock('@pinecone-database/pinecone', () => {
+      // This factory function is called by Jest to create the mock for '@pinecone-database/pinecone'.
+      // It uses the mock functions (newMockInit, localNewMock*) defined in the beforeEach scope.
+      const constructorMockImpl = jest.fn().mockImplementation(() => ({
+        init: newMockInit, // Uses the newMockInit from beforeEach's scope (reassigned above)
+        index: localNewMockIndexMethod,
+        createIndex: localNewMockCreateIndex,
+        describeIndex: localNewMockDescribeIndex,
+        listIndexes: localNewMockListIndexes,
       }));
-      return { Pinecone: constructorMock };
+      return { Pinecone: constructorMockImpl };
     });
+    // The extraneous }); from original line 78 was removed as part of this replacement.
+    // The code that was originally from line 79 onwards will now correctly follow inside the beforeEach.
 
     // Now require the mock to get the fresh constructor instance for assertions
     FreshPineconeConstructorMock = require('@pinecone-database/pinecone').Pinecone;
@@ -238,9 +245,17 @@ describe('Pinecone Index Setup (lib/pineconeClient.ts - setupPineconeIndex)', ()
 
     pineconeClientModule = require('./pineconeClient');
    });
-    // getPineconeClient will succeed here
+  it('should throw if PINECONE_INDEX_NAME is missing for setupPineconeIndex', async () => {
+    // Ensure PINECONE_INDEX_NAME is undefined for this specific test,
+    // overriding the value set in beforeEach.
+    delete process.env.PINECONE_INDEX_NAME;
+
+    // getPineconeClient will succeed here because API key and ENV are set in beforeEach
+    // and it doesn't require PINECONE_INDEX_NAME.
+    // This call ensures the pinecone client instance is created using the mocks.
     pineconeClientModule.getPineconeClient();
-    // Now test setupPineconeIndex
+    
+    // Now test setupPineconeIndex, which *does* require PINECONE_INDEX_NAME
     await expect(pineconeClientModule.setupPineconeIndex()).rejects.toThrow(/PINECONE_INDEX_NAME environment variable is not set/i);
   });
 
