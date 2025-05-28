@@ -23,7 +23,8 @@ import {
 } from '@/lib/chatUtils';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
-const openai = getOpenAIClient(); // CHANGED - Use the singleton client
+// const openai = getOpenAIClient(); // MOVED inside POST to ensure mock is ready for streaming
+// REMOVED: openai client will be initialized within POST as needed
 
 export async function GET(request: NextRequest) {
   console.log('GET /api/chat: Received request');
@@ -170,7 +171,7 @@ export async function POST(request: NextRequest) {
     let conversation: Conversation;
     let isNewConversation = false;
 
-if (conversationId && !conversationId.startsWith('new-')) {
+if (currentConversationId && !currentConversationId.startsWith('new-')) {
       const existingConversation = await db.conversation.findFirst({
         where: { id: currentConversationId, userId: userId }
       });
@@ -222,8 +223,9 @@ if (conversationId && !conversationId.startsWith('new-')) {
     messagesForLLM.push({ role: 'user', content: userMessageContent });
 
     if (streaming) {
+      const openai = getOpenAIClient(); // Initialize client here for streaming path
       console.log('POST /api/chat: Starting stream for AI response...');
-      const llmStream = await openai.chat.completions.create({ // openai is now from getOpenAIClient()
+      const llmStream = await openai.chat.completions.create({
         model: DEFAULT_LLM_MODEL,
         messages: messagesForLLM as any, 
         temperature: DEFAULT_LLM_TEMPERATURE,

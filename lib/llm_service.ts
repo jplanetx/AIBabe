@@ -1,10 +1,9 @@
 // File: lib/llm_service.ts
-import OpenAI from 'openai';
+// import OpenAI from 'openai'; // REMOVED - Will use getOpenAIClient
+import { getOpenAIClient } from '@/lib/openaiClient'; // ADDED
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize OpenAI client using the singleton
+const openai = getOpenAIClient(); // CHANGED
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -86,7 +85,9 @@ export async function getChatCompletion(
     }
     
     // Return a fallback response instead of throwing
-    return "I'm sorry, I'm having trouble responding right now. Please try again in a moment.";
+    // return "I'm sorry, I'm having trouble responding right now. Please try again in a moment.";
+    // Re-throw the error so the caller can handle it appropriately (e.g., return 502)
+    throw error;
   }
 }
 

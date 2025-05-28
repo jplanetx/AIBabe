@@ -20,18 +20,26 @@ jest.mock('openai', () => {
 });
 // Revised mocking strategy for openaiClient to avoid hoisting issues
 
-jest.mock('@/lib/openaiClient', () => ({
-  __esModule: true,
-  getOpenAIClient: () => ({ // This function is returned when SUT calls getOpenAIClient()
-    chat: {
-      completions: {
-        // The factory for jest.mock runs before other code in the module.
-        // So, chat.completions.create will be this specific jest.fn() instance.
-        create: jest.fn().mockResolvedValue({ choices: [{ message: { content: 'initial default fake LLM response from factory' } }] })
-      }
-    }
-  })
-}));
+// Revised mocking strategy for openaiClient to ensure tests control the correct mock instance.
+// The mock factory for jest.mock() cannot access out-of-scope variables directly.
+// So, we create the mock function inside the factory and provide a way to access it.
+
+jest.mock('@/lib/openaiClient', () => {
+  // This function is created when the mock factory runs (due to hoisting).
+  const actualMockCreateInstance = jest.fn();
+  return {
+    __esModule: true,
+    getOpenAIClient: () => ({ // This is what the SUT calls
+      chat: {
+        completions: {
+          create: actualMockCreateInstance, // SUT uses this instance
+        },
+      },
+    }),
+    // Provide a way for tests to get a reference to this specific mock instance
+    _getActualMockCreateInstance: () => actualMockCreateInstance,
+  };
+});
 
 // IMPORTS - Order can be important. SUT and its dependencies should see mocks.
 import { NextRequest, NextResponse } from 'next/server';
@@ -136,13 +144,24 @@ jest.mock('@/lib/db', () => {
   };
 });
 
-jest.mock('@/lib/chatUtils', () => ({
-  ...jest.requireActual('@/lib/chatUtils'),
-  getPersonaDetails: jest.fn(),
-  analyzeSentiment: jest.fn(),
-  getRelevantMemory: jest.fn(),
-  saveMessage: jest.fn(),
-}));
+jest.mock('@/lib/chatUtils', () => {
+  const originalModule = jest.requireActual('@/lib/chatUtils');
+  return {
+    __esModule: true,
+    ...originalModule,
+    getPersonaDetails: jest.fn(() => Promise.resolve({ id: 'default-persona-id', name: 'Default Persona from Mock Factory', traits: ['default'] })),
+    analyzeSentiment: jest.fn(() => Promise.resolve('neutral')),
+    getRelevantMemory: jest.fn(() => Promise.resolve([])),
+    saveMessage: jest.fn((userId: string, conversationId: string, content: string, isUserMessage: boolean) => Promise.resolve({
+      id: `msg-${Date.now()}`,
+      conversationId,
+      content,
+      isUserMessage,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })),
+  };
+});
 
 jest.mock('@/lib/llm_service', () => {
   const originalModule = jest.requireActual('@/lib/llm_service');
@@ -160,7 +179,9 @@ jest.mock('@/lib/vector_db', () => ({
 
 
 const mockSupabase = createServerClient as jest.Mock;
-const { getPersonaDetails, analyzeSentiment, getRelevantMemory, saveMessage } = jest.requireMock('@/lib/chatUtils') as jest.Mocked<typeof import('@/lib/chatUtils')>;
+// Import the whole module to allow spying on its methods
+import * as chatUtils from '@/lib/chatUtils';
+import type { Persona } from '@/lib/chatUtils'; // ADDED Persona type import
 const { getChatCompletion } = jest.requireMock('@/lib/llm_service') as jest.Mocked<typeof import('@/lib/llm_service')>;
 
 const mockedDb = db as unknown as {
@@ -185,7 +206,8 @@ const mockedDb = db as unknown as {
 
 describe('/api/chat POST', () => {
   let mockRequest: NextRequest;
-  let mockCreateFn: jest.Mock; // To hold the reference to the mocked create function
+  let mockCreateFn: jest.Mock; // For non-streaming OpenAI calls (via global 'openai' mock)
+  let streamingPathMockCreateFn: jest.Mock; // For streaming OpenAI calls (via '@/lib/openaiClient' mock)
   const mockUser = { id: 'user-123', email: 'test@example.com' };
   const mockSession = { user: mockUser, expires_at: Date.now() + 3600000, access_token: 'token', refresh_token: 'refresh' };
 
@@ -202,8 +224,22 @@ describe('/api/chat POST', () => {
     // Access the exposed mock create method from the globally mocked OpenAI class
     mockCreateFn = (MockedOpenAI as any)._getGlobalMockCreateMethod();
 
-    mockCreateFn.mockClear();
+    mockCreateFn.mockClear(); // This is for the global 'openai' mock
     mockCreateFn.mockResolvedValue({ choices: [{ message: { content: 'response from mockCreateFn in beforeEach (global path)' } }] });
+
+    // Get the mock for the streaming path from the '@/lib/openaiClient' mock
+    const openAIClientModuleMock = jest.requireMock('@/lib/openaiClient');
+    // Retrieve the actual mock instance created within the factory
+    streamingPathMockCreateFn = openAIClientModuleMock._getActualMockCreateInstance();
+    
+    // Reset and provide a default implementation for this mock before each test
+    streamingPathMockCreateFn.mockClear().mockResolvedValue({
+      choices: [{ message: { content: 'Default mock response from _getActualMockCreateInstance for @/lib/openaiClient (non-streaming)' } }],
+      // Provide a default async iterator for streaming tests as well
+      [Symbol.asyncIterator]: async function*() {
+        yield { choices: [{ delta: { content: 'default stream chunk from _getActualMockCreateInstance' } }] };
+      }
+    });
 
     mockedDb.conversation.findFirst.mockReset();
     mockedDb.conversation.create.mockReset();
@@ -212,10 +248,15 @@ describe('/api/chat POST', () => {
     mockedDb.message.create.mockReset();
     mockedDb.girlfriend.findUnique.mockReset();
 
-    (getPersonaDetails as jest.Mock).mockResolvedValue({ id: 'persona-1', name: 'Test Persona', traits: ['helpful', 'kind'] }); // Restored as per user feedback
-    (analyzeSentiment as jest.Mock).mockResolvedValue('neutral'); // Restored as per user feedback
-    (getRelevantMemory as jest.Mock).mockResolvedValue([]);
-    (saveMessage as jest.Mock).mockImplementation(async (userId: string, conversationId: string, content: string, isUserMessage: boolean, prismaInstance: any): Promise<Message> => ({
+    // Default mocks are now set in the factory, but can be overridden here if needed for all tests in describe block
+    // For instance, if a common persona is used across many tests:
+    // Revert to allowing the module factory mock to provide the default for getPersonaDetails.
+    // Individual tests will use spyOn for specific overrides.
+    // jest.spyOn(chatUtils, 'getPersonaDetails').mockResolvedValue({ id: 'persona-1', name: 'Test Persona', traits: ['helpful', 'kind'] });
+    (chatUtils.getPersonaDetails as jest.Mock).mockResolvedValue({ id: 'persona-1', name: 'Test Persona', traits: ['helpful', 'kind'] }); // Default from factory
+    jest.spyOn(chatUtils, 'analyzeSentiment').mockResolvedValue('neutral'); // Keep spy for this as it's consistently overridden
+    jest.spyOn(chatUtils, 'getRelevantMemory').mockResolvedValue([]);
+    jest.spyOn(chatUtils, 'saveMessage').mockImplementation(async (userId: string, conversationId: string, content: string, isUserMessage: boolean, prismaInstance: any): Promise<Message> => ({
       id: isUserMessage ? 'user-msg-id' : 'ai-msg-id',
       conversationId,
       content,
@@ -249,14 +290,46 @@ describe('/api/chat POST', () => {
     mockedDb.conversation.update.mockResolvedValue({} as Conversation);
   });
 
+it('should correctly initialize and provide access to the global OpenAI mockCreateMethod', () => {
+    // This test specifically verifies that the _getGlobalMockCreateMethod
+    // on the globally mocked 'openai' module is accessible and returns a valid Jest mock function.
+    // This is crucial for preventing hoisting-related ReferenceErrors.
+
+    const MockedOpenAI = jest.requireMock('openai');
+    expect(MockedOpenAI._getGlobalMockCreateMethod).toBeDefined();
+    expect(typeof MockedOpenAI._getGlobalMockCreateMethod).toBe('function');
+
+    const retrievedMockCreateFn = (MockedOpenAI as any)._getGlobalMockCreateMethod();
+    expect(retrievedMockCreateFn).toBeDefined();
+    
+    // Verify it's a Jest mock function by checking for the .mock property
+    expect(retrievedMockCreateFn.mock).toBeDefined();
+    expect(typeof retrievedMockCreateFn.mock.calls).toBe('object'); // .calls is an array on a Jest mock
+
+    // Ensure it can be called without throwing an immediate ReferenceError due to initialization problems.
+    // The beforeEach for this describe block would have already run and potentially set a resolved value.
+    // The key here is that the function itself is accessible and behaves like a mock.
+    expect(async () => {
+      await retrievedMockCreateFn({ messages: [{ role: 'user', content: 'test call from mock verification test' }] });
+    }).not.toThrow();
+
+    // Further check if it's the same instance as the one set up in beforeEach,
+    // which implies it's correctly shared and initialized.
+    expect(retrievedMockCreateFn).toBe(mockCreateFn); 
+  });
   const createMockRequest = (body: any, searchParams?: Record<string, string>) => {
     const url = new URL('http://localhost/api/chat');
     if (searchParams) {
         Object.entries(searchParams).forEach(([key, value]) => url.searchParams.set(key, value));
     }
+    // Ensure essential fields for new conversations are present if not explicitly provided
+    const requestBody = {
+      characterId: 'default-char-id-for-new-conv', // Default if not testing specific character
+      ...body
+    };
     return new NextRequest(url.toString(), {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify(requestBody),
       headers: { 'Content-Type': 'application/json' },
     });
   };
@@ -288,45 +361,80 @@ describe('/api/chat POST', () => {
   });
   
   it('should call analyzeSentiment and getRelevantMemory', async () => {
-    mockRequest = createMockRequest({ message: 'Test message', characterId: 'persona-1' });
+    mockRequest = createMockRequest({ message: 'Test message', characterId: 'persona-1', conversationId: 'existing-conv-id' });
     await POST(mockRequest);
-    expect(analyzeSentiment).toHaveBeenCalledWith('Test message');
-    expect(getRelevantMemory).toHaveBeenCalledWith(mockUser.id, expect.any(String), 'Test message');
+    expect(chatUtils.analyzeSentiment).toHaveBeenCalledWith('Test message');
+    expect(chatUtils.getRelevantMemory).toHaveBeenCalledWith(mockUser.id, expect.any(String), 'Test message');
   });
 
   it('should construct system prompt with persona and empathy note for negative sentiment', async () => {
-    (getPersonaDetails as jest.Mock).mockClear().mockResolvedValueOnce({ id: 'lily-id', name: 'Lily', traits: ['witty', 'companion'] });
-    (analyzeSentiment as jest.Mock).mockClear().mockResolvedValueOnce('negative');
-    mockRequest = createMockRequest({ message: 'I am sad', characterId: 'lily-id' });
+    // This spy needs to cover the call for 'lily-id' (from request)
+    // AND potentially for 'new-conv-id's girlfriendId if it differs after creation.
+    // The SUT calls getPersonaDetails(characterId) then getPersonaDetails(conversation.girlfriendId)
+    // For a new conversation, conversation.girlfriendId becomes the ID from the first call.
+    // So, one mock for the specific characterId should suffice.
+    jest.spyOn(chatUtils, 'getPersonaDetails').mockImplementation(async (characterId?: string) => {
+      if (characterId === 'lily-id') {
+        return { id: 'lily-id', name: 'Lily', traits: ['witty', 'companion'] } as Persona;
+      }
+      // Fallback for the second call if conversation.girlfriendId is different or for other tests
+      if (characterId === 'persona-1') { // Default ID from beforeEach if new conv was created with it
+        return { id: 'persona-1', name: 'Test Persona', traits: ['helpful', 'kind'] } as Persona;
+      }
+      return { id: 'default-fallback-id', name: 'Default Fallback Persona', traits: ['fallback'] } as Persona;
+    });
+    jest.spyOn(chatUtils, 'analyzeSentiment').mockResolvedValueOnce('negative');
+    
+    mockRequest = createMockRequest({ message: 'I am sad', characterId: 'lily-id', conversationId: 'new-conv-for-lily' });
     await POST(mockRequest);
-    // Assertion target changes to mockCreateFn as per user feedback implication
-    expect(mockCreateFn).toHaveBeenCalled();
-    const messagesArg = mockCreateFn.mock.calls[0][0].messages;
+    
+    expect(streamingPathMockCreateFn).toHaveBeenCalled();
+    const messagesArg = streamingPathMockCreateFn.mock.calls[0][0].messages;
     const systemMessage = messagesArg.find((m: any) => m.role === 'system');
     expect(systemMessage.content).toContain('You are Lily. Traits: witty, companion.');
     expect(systemMessage.content).toContain('Remember to be extra understanding and empathetic.');
   });
 
   it('should construct system prompt without empathy note for non-negative sentiment', async () => {
-    (getPersonaDetails as jest.Mock).mockClear().mockResolvedValueOnce({ id: 'persona-1', name: 'Test Persona', traits: ['neutral'] });
-    (analyzeSentiment as jest.Mock).mockClear().mockResolvedValueOnce('neutral');
-    mockRequest = createMockRequest({ message: 'Neutral message', characterId: 'persona-1' });
+    jest.spyOn(chatUtils, 'getPersonaDetails').mockImplementation(async (characterId?: string) => {
+      if (characterId === 'persona-neutral-test') { // Use a distinct characterId for this test
+        return { id: 'persona-neutral-test', name: 'Neutral Persona', traits: ['neutral'] } as Persona;
+      }
+      if (characterId === 'persona-1') {
+        return { id: 'persona-1', name: 'Test Persona', traits: ['helpful', 'kind'] } as Persona;
+      }
+      return { id: 'default-fallback-id', name: 'Default Fallback Persona', traits: ['fallback'] } as Persona;
+    });
+    jest.spyOn(chatUtils, 'analyzeSentiment').mockResolvedValueOnce('neutral');
+    
+    mockRequest = createMockRequest({ message: 'Neutral message', characterId: 'persona-neutral-test', conversationId: 'new-conv-neutral' });
     await POST(mockRequest);
-    expect(mockCreateFn).toHaveBeenCalled();
-    const messagesArg = mockCreateFn.mock.calls[0][0].messages;
+    
+    expect(streamingPathMockCreateFn).toHaveBeenCalled();
+    const messagesArg = streamingPathMockCreateFn.mock.calls[0][0].messages;
     const systemMessage = messagesArg.find((m: any) => m.role === 'system');
-    expect(systemMessage.content).toContain('You are Test Persona. Traits: neutral.');
+    expect(systemMessage.content).toContain('You are Neutral Persona. Traits: neutral.');
     expect(systemMessage.content).not.toContain('Remember to be extra understanding and empathetic.');
   });
 
   it('should assemble messages for LLM in correct order', async () => {
-    (getPersonaDetails as jest.Mock).mockClear().mockResolvedValueOnce({ id: 'order-bot-id', name: 'OrderBot', traits: ['orderly'] });
-    (analyzeSentiment as jest.Mock).mockClear().mockResolvedValueOnce('positive');
-    (getRelevantMemory as jest.Mock).mockClear().mockResolvedValueOnce(['Memory: foo', 'Memory: bar']);
-    mockRequest = createMockRequest({ message: 'User input', characterId: 'order-bot-id' });
+    jest.spyOn(chatUtils, 'getPersonaDetails').mockImplementation(async (characterId?: string) => {
+      if (characterId === 'order-bot-id') {
+        return { id: 'order-bot-id', name: 'OrderBot', traits: ['orderly'] } as Persona;
+      }
+      if (characterId === 'persona-1') {
+        return { id: 'persona-1', name: 'Test Persona', traits: ['helpful', 'kind'] } as Persona;
+      }
+      return { id: 'default-fallback-id', name: 'Default Fallback Persona', traits: ['fallback'] } as Persona;
+    });
+    jest.spyOn(chatUtils, 'analyzeSentiment').mockResolvedValueOnce('positive');
+    jest.spyOn(chatUtils, 'getRelevantMemory').mockResolvedValueOnce(['Memory: foo', 'Memory: bar']);
+    
+    mockRequest = createMockRequest({ message: 'User input', characterId: 'order-bot-id', conversationId: 'new-conv-order' });
     await POST(mockRequest);
-    expect(mockCreateFn).toHaveBeenCalled();
-    const messagesArg = mockCreateFn.mock.calls[0][0].messages;
+    
+    expect(streamingPathMockCreateFn).toHaveBeenCalled();
+    const messagesArg = streamingPathMockCreateFn.mock.calls[0][0].messages;
     expect(messagesArg.length).toBe(4);
     expect(messagesArg[0].role).toBe('system');
     expect(messagesArg[0].content).toContain('You are OrderBot. Traits: orderly.');
@@ -340,53 +448,55 @@ describe('/api/chat POST', () => {
 
   it('should call LLM and extract reply for non-streaming', async () => {
     // This test was checking getChatCompletion from llm_service.
-    // Now, with the direct openaiClient mock, we expect mockCreateFn to be called
-    // and its resolved value to be processed by the SUT.
-    mockCreateFn.mockResolvedValueOnce({ choices: [{ message: { content: 'Extracted AI reply' } }] });
-    mockRequest = createMockRequest({ message: 'Query', characterId: 'persona-1', stream: false }); // ensure non-streaming
+    // Now, with the direct openaiClient mock (streamingPathMockCreateFn), we expect it to be called
+    // and its resolved value to be processed by the SUT for non-streaming too.
+    streamingPathMockCreateFn.mockResolvedValueOnce({ choices: [{ message: { content: 'Extracted AI reply' } }] });
+    mockRequest = createMockRequest({ message: 'Query', characterId: 'persona-1', stream: false, conversationId: 'new-conv-query' }); // ensure non-streaming
     const response = await POST(mockRequest);
     const json = await response.json();
-    expect(mockCreateFn).toHaveBeenCalled();
+    expect(streamingPathMockCreateFn).toHaveBeenCalled();
     expect(json.data.reply).toBe('Extracted AI reply');
   });
 
   it('should save user and AI messages', async () => {
-    // Default mockCompletionsCreate provides 'default fake LLM response from beforeEach'
     // (getPersonaDetails and analyzeSentiment are using defaults from beforeEach)
-    mockRequest = createMockRequest({ message: 'Persist me', characterId: 'persona-1', stream: false });
+    // The non-streaming path now uses streamingPathMockCreateFn.
+    // Its default in beforeEach is: 'Default mock response from _getActualMockCreateInstance for @/lib/openaiClient (non-streaming)'
+    streamingPathMockCreateFn.mockResolvedValueOnce({ choices: [{ message: { content: 'AI response for save test' } }] });
+    mockRequest = createMockRequest({ message: 'Persist me', characterId: 'persona-1', stream: false, conversationId: 'new-conv-persist' });
     await POST(mockRequest);
-    expect(saveMessage).toHaveBeenCalledTimes(2);
-    expect(saveMessage).toHaveBeenCalledWith(mockUser.id, expect.any(String), 'Persist me', true, db);
-    // AI response should now come from mockCreateFn's default in beforeEach (global path)
-    expect(saveMessage).toHaveBeenCalledWith(mockUser.id, expect.any(String), 'response from mockCreateFn in beforeEach (global path)', false, db);
+    expect(chatUtils.saveMessage).toHaveBeenCalledTimes(2);
+    expect(chatUtils.saveMessage).toHaveBeenCalledWith(mockUser.id, expect.any(String), 'Persist me', true, db);
+    expect(chatUtils.saveMessage).toHaveBeenCalledWith(mockUser.id, expect.any(String), 'AI response for save test', false, db);
   });
   
   it('should return JSON response for non-streaming requests', async () => {
     // (getPersonaDetails and analyzeSentiment are using defaults from beforeEach)
-    // mockCreateFn will use its default from beforeEach for POST
-    mockRequest = createMockRequest({ message: 'Non-stream test', stream: false });
+    // The non-streaming path now uses streamingPathMockCreateFn.
+    streamingPathMockCreateFn.mockResolvedValueOnce({ choices: [{ message: { content: 'AI response for JSON test' } }] });
+    mockRequest = createMockRequest({ message: 'Non-stream test', characterId: 'persona-1', stream: false, conversationId: 'new-conv-nonstream' });
     const response = await POST(mockRequest);
     expect(response.headers.get('Content-Type')).toContain('application/json');
     const json = await response.json();
     expect(json.success).toBe(true);
-    // AI response should now come from mockCreateFn's default in beforeEach (global path)
-    expect(json.data.reply).toBe('response from mockCreateFn in beforeEach (global path)');
+    expect(json.data.reply).toBe('AI response for JSON test');
   });
 
   describe('Streaming', () => {
     beforeEach(() => {
+      // Specific mock for streaming tests, targeting the correct mock instance
       const mockStreamData = {
         [Symbol.asyncIterator]: async function*() {
           yield { choices: [{ delta: { content: 'Hello' } }] };
           yield { choices: [{ delta: { content: ' world' } }] };
         }
       };
-      mockCreateFn.mockResolvedValue(mockStreamData as any); // Corrected typo: mockCompletionsCreate -> mockCreateFn
+      streamingPathMockCreateFn.mockResolvedValue(mockStreamData as any);
     });
     
     it('should return StreamingTextResponse for streaming requests', async () => {
       // (getPersonaDetails and analyzeSentiment are using defaults from beforeEach)
-      mockRequest = createMockRequest({ message: 'Stream test', characterId: 'persona-1' }, { stream: 'true' });
+      mockRequest = createMockRequest({ message: 'Stream test', characterId: 'persona-1', conversationId: 'new-conv-stream' }, { stream: 'true' });
       const response = await POST(mockRequest);
       
       const { StreamingTextResponse: StreamingTextResponseMock } = jest.requireMock('ai');
@@ -394,30 +504,30 @@ describe('/api/chat POST', () => {
       expect(response.status).toBe(200);
       expect(response.headers.get('Content-Type')).toBe('text/event-stream');
       // expect(actualMockGetOpenAIClient).toHaveBeenCalled(); // No longer relevant with new mock
-      expect(mockCreateFn).toHaveBeenCalled(); // Corrected typo and target
+      expect(streamingPathMockCreateFn).toHaveBeenCalled();
     });
   
     it('should save AI message after streaming is complete', async () => {
       // (getPersonaDetails and analyzeSentiment are using defaults from beforeEach)
       // The global mock for OpenAIStream in jest.mock('ai',...) should now handle onCompletion.
       // The beforeEach for streaming sets up mockCompletionsCreate to return mockStreamData
-      mockRequest = createMockRequest({ message: 'Stream and save', characterId: 'persona-1' }, { stream: 'true' });
+      mockRequest = createMockRequest({ message: 'Stream and save', characterId: 'persona-1', conversationId: 'new-conv-streamsave' }, { stream: 'true' });
       await POST(mockRequest);
       
       await new Promise(resolve => setImmediate(resolve)); // Allow microtasks (like onCompletion) to run
       
-      expect(saveMessage).toHaveBeenCalledTimes(2);
-      expect(saveMessage).toHaveBeenCalledWith(mockUser.id, expect.any(String), 'Hello world', false, db); // Content from mockStreamData
-      expect(mockCreateFn).toHaveBeenCalled(); // Corrected typo and target
+      expect(chatUtils.saveMessage).toHaveBeenCalledTimes(2);
+      expect(chatUtils.saveMessage).toHaveBeenCalledWith(mockUser.id, expect.any(String), 'Hello world', false, db); // Content from mockStreamData
+      expect(streamingPathMockCreateFn).toHaveBeenCalled();
     });
   });
 
 
   it('should return 500 for generic errors', async () => {
     // analyzeSentiment is called before getPersonaDetails in the SUT's try block
-    (analyzeSentiment as jest.Mock).mockClear().mockResolvedValueOnce('neutral'); // Ensure it doesn't reject by default
-    (getPersonaDetails as jest.Mock).mockClear().mockRejectedValueOnce(new Error('Generic error'));
-    mockRequest = createMockRequest({ message: 'Error test' });
+    jest.spyOn(chatUtils, 'analyzeSentiment').mockResolvedValueOnce('neutral'); // Ensure it doesn't reject by default
+    jest.spyOn(chatUtils, 'getPersonaDetails').mockRejectedValueOnce(new Error('Generic error'));
+    mockRequest = createMockRequest({ message: 'Error test', characterId: 'persona-error-test', conversationId: 'new-conv-errortest' });
     const response = await POST(mockRequest);
     expect(response.status).toBe(500);
     const json = await response.json();
@@ -426,8 +536,8 @@ describe('/api/chat POST', () => {
 
   it('should return 502 if LLM call fails (non-streaming)', async () => {
     // (getPersonaDetails and analyzeSentiment are using defaults from beforeEach)
-    mockCreateFn.mockClear().mockRejectedValueOnce(new Error('LLM connection failed'));
-    mockRequest = createMockRequest({ message: 'LLM error test', stream: false }); // ensure non-streaming
+    streamingPathMockCreateFn.mockClear().mockRejectedValueOnce(new Error('LLM connection failed'));
+    mockRequest = createMockRequest({ message: 'LLM error test', characterId: 'persona-llm-error', stream: false, conversationId: 'new-conv-llmerror' }); // ensure non-streaming
     const response = await POST(mockRequest);
     expect(response.status).toBe(502);
     const json = await response.json();
@@ -435,13 +545,13 @@ describe('/api/chat POST', () => {
   });
   
   it('should default to neutral sentiment and empty memory if fetching them fails', async () => {
-    (getPersonaDetails as jest.Mock).mockClear().mockResolvedValueOnce({ id: 'persona-1', name: 'Test Persona', traits: ['helpful', 'kind'] }); // Ensure getPersonaDetails doesn't fail
-    (analyzeSentiment as jest.Mock).mockClear().mockRejectedValueOnce(new Error('Sentiment API down'));
-    (getRelevantMemory as jest.Mock).mockClear().mockRejectedValueOnce(new Error('Memory DB down'));
-    mockRequest = createMockRequest({ message: 'Fallback test' });
+    jest.spyOn(chatUtils, 'getPersonaDetails').mockResolvedValueOnce({ id: 'persona-1', name: 'Test Persona', traits: ['helpful', 'kind'] }); // Ensure getPersonaDetails doesn't fail
+    jest.spyOn(chatUtils, 'analyzeSentiment').mockRejectedValueOnce(new Error('Sentiment API down'));
+    jest.spyOn(chatUtils, 'getRelevantMemory').mockRejectedValueOnce(new Error('Memory DB down'));
+    mockRequest = createMockRequest({ message: 'Fallback test', characterId: 'persona-fallback', conversationId: 'new-conv-fallback' });
     await POST(mockRequest);
-    expect(mockCreateFn).toHaveBeenCalled();
-    const messagesArg = mockCreateFn.mock.calls[0][0].messages;
+    expect(streamingPathMockCreateFn).toHaveBeenCalled();
+    const messagesArg = streamingPathMockCreateFn.mock.calls[0][0].messages;
     const systemMessage = messagesArg.find((m: any) => m.role === 'system');
     expect(systemMessage.content).not.toContain('Remember to be extra understanding and empathetic.');
     expect(messagesArg.filter((m:any) => m.role === 'system' && m.content.startsWith('Memory:')).length).toBe(0);

@@ -19,10 +19,14 @@ module.exports = {
       testEnvironment: 'jsdom',
       setupFilesAfterEnv: ['@testing-library/jest-dom'],
       testMatch: [
-        '<rootDir>/app/**/*.test.{js,jsx,ts,tsx}',
+        '<rootDir>/app/**/*.test.{js,jsx,ts,tsx}', // Will still match app/api initially
         '<rootDir>/components/**/*.test.{js,jsx,ts,tsx}',
         '<rootDir>/lib/**/*.test.{js,jsx,ts,tsx}',
-        '!<rootDir>/app/api/**/*.test.{js,jsx,ts,tsx}',
+        // Removed negation: '!<rootDir>/app/api/**/*.test.{js,jsx,ts,tsx}',
+      ],
+      testPathIgnorePatterns: [ // Added to explicitly ignore app/api paths for jsdom
+        '/node_modules/',
+        '<rootDir>/app/api/'
       ],
       transform: {
         '^.+\\.(js|jsx|ts|tsx)$': ['babel-jest', { presets: ['next/babel'] }],
