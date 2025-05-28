@@ -1,166 +1,106 @@
+import { NextResponse, type NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
+import { createServerClient, type CookieOptions } from '@supabase/ssr'; // Assuming this is the correct client
+import { z } from 'zod';
+import { db } from '@/lib/db'; // Assuming this is the correct Prisma client import
+
 export const dynamic = 'force-dynamic';
-import { NextRequest, NextResponse } from 'next/server';
-import { db } from "@/lib/db";
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
-/**
- * GET handler: Fetch the user’s profile based on the session.
- */
-export async function GET(request: NextRequest) {
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+const profileSchema = z.object({
+  firstName: z.string().min(1, { message: 'First name cannot be empty' }).optional(),
+  lastName: z.string().min(1, { message: 'Last name cannot be empty' }).optional(),
+  bio: z.string().optional(),
+}).strict({ message: 'Unexpected fields in request body' });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
-        },
-      },
-    }
-  );
-
+export async function POST(request: NextRequest) {
   try {
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      console.error("Error getting user or no user:", authError);
-      return NextResponse.json({ error: "Internal server error during session retrieval" }, { status: 500 });
-    }
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const basicUser = await db.user.findUnique({
-      where: {
-        id: user.id,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true,
-        updatedAt: true,
-        subscription: true,
-      },
-    });
-
-    if (!basicUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-
-    // Fetch UserProfile separately
-    const userProfile = await db.userProfile.findUnique({
-      where: {
-        userId: user.id,
-      },
-    });
-
-    // Combine user and userProfile data
-    const userWithProfile = {
-      ...basicUser,
-      userProfile: userProfile || null, // Attach profile or null if not found
-    };
-
-    return NextResponse.json(userWithProfile);
-  } catch (error) {
-    console.error("Error fetching user profile:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
+    // const cookieStore = cookies(); // This will be awaited inside the handlers
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          async get(name: string) {
+            const cookieStore = await cookies();
+            return cookieStore.get(name)?.value;
+          },
+          async set(name: string, value: string, options: CookieOptions) {
+            const cookieStore = await cookies();
+            cookieStore.set(name, value, options);
+          },
+          async remove(name: string, options: CookieOptions) {
+            const cookieStore = await cookies();
+            cookieStore.set(name, '', options);
+          },
+        },
+      }
     );
-  }
-}
 
-/**
- * POST handler: Create the user's profile if it does not exist.
- * This is the route tested in app/api/user/profile/route.test.ts
- */
-export async function POST(request: NextRequest) { // Changed Request to NextRequest
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value;
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          response.cookies.set({ name, value, ...options });
-        },
-        remove(name: string, options: CookieOptions) {
-          response.cookies.set({ name, value: '', ...options });
-        },
-      },
-    }
-  );
-
-  try {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      console.error("Error getting user for POST or no user:", authError);
-      return NextResponse.json({ error: "Internal server error during user retrieval or user not found" }, { status: 500 });
+      console.error('Error fetching user or no user authenticated:', authError);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    // Assuming the body directly contains the preferences payload for `profileData`
-    // and potentially other fields for UserProfile.
-    // For simplicity, let's assume `body` is the object to be stored in `profileData`.
+    let requestBody;
+    try {
+      requestBody = await request.json();
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid request body: Not JSON' }, { status: 400 });
+    }
 
-    const userId = user.id; // Use the authenticated user's ID
+    const validationResult = profileSchema.safeParse(requestBody);
 
-    // Check if UserProfile already exists
-    const existingUserProfile = await db.userProfile.findUnique({
-      where: { userId: userId },
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: validationResult.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const validatedProfileData = validationResult.data;
+
+    // Ensure a User record exists
+    let prismaUser = await db.user.findUnique({
+      where: { id: user.id },
     });
 
-    if (existingUserProfile) {
-      // UserProfile exists, update it
-      const updatedUserProfile = await db.userProfile.update({
-        where: { userId: userId },
+    if (!prismaUser) {
+      prismaUser = await db.user.create({
         data: {
-          profileData: JSON.stringify(body), // Store the entire body as a JSON string
-          lastUpdated: new Date(),
-          // Potentially update confidenceScore or other fields if applicable
+          id: user.id,
+          email: user.email, // Store email if available, good for reference
         },
       });
-      console.log(`UserProfile for user ${userId} updated.`);
-      return NextResponse.json(updatedUserProfile, { status: 200 });
-    } else {
-      // UserProfile does not exist, create it
-      const newUserProfile = await db.userProfile.create({
-        data: {
-          userId: userId,
-          profileData: JSON.stringify(body), // Store the entire body as a JSON string
-          // Set default confidenceScore or other initial values if needed
-        },
-      });
-      console.log(`UserProfile for user ${userId} created.`);
-      return NextResponse.json(newUserProfile, { status: 201 });
     }
+
+    // Create or update UserProfile
+    // The UserProfile model stores profile data as a JSON string in the 'profileData' field.
+    const profileDataString = JSON.stringify(validatedProfileData);
+
+    const userProfile = await db.userProfile.upsert({
+      where: { userId: user.id },
+      update: {
+        profileData: profileDataString,
+        lastUpdated: new Date(), // Explicitly update lastUpdated timestamp
+      },
+      create: {
+        userId: user.id,
+        profileData: profileDataString,
+      },
+    });
+
+    // It might be better to return the parsed profile data instead of the whole userProfile object
+    // which includes the stringified version. For now, returning as is.
+    return NextResponse.json({ message: 'Profile created/updated successfully', profile: validatedProfileData }, { status: 201 });
+
   } catch (error) {
-    console.error('Error creating/updating UserProfile:', error);
-    if (error instanceof Error) {
-      return NextResponse.json({ error: 'Failed to create profile', details: error.message }, { status: 500 });
+    console.error('Error in POST /api/user/profile:', error);
+    if (error instanceof z.ZodError) { // Should be caught by safeParse, but as a safeguard
+        return NextResponse.json({ error: 'Invalid request body format.', details: error.flatten().fieldErrors }, { status: 400 });
     }
-    return NextResponse.json({ error: 'Failed to create profile', details: 'An unknown error occurred' }, { status: 500 });
+    // Consider more specific error handling for Prisma errors if needed
+    return NextResponse.json({ error: 'An unexpected server error occurred.' }, { status: 500 });
   }
 }

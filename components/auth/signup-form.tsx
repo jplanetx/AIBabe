@@ -59,7 +59,7 @@ const SignupForm = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6" data-testid="signup-form">
       {error && <p className="text-red-500 text-sm text-center">{error}</p>}
       {successMessage && <p className="text-green-500 text-sm text-center">{successMessage}</p>}
       <div>

@@ -36,7 +36,9 @@ describe('Environment Variable Validation (lib/validateEnv.ts)', () => {
   currentlyRequiredByScript.forEach(varName => {
     it(`should throw an error if currently required environment variable ${varName} is missing`, () => {
       delete process.env[varName];
-      const patternString = `^Missing required environment variable: ${varName}$`;
+      // Regex to match "Missing required environment variables: " and ensure varName is in the list.
+      // Allows for other variables to also be in the list.
+      const patternString = `Missing required environment variables:.*${varName}`;
       const expectedErrorRegex = new RegExp(patternString);
       // Test the exported function directly
       expect(() => validateEnvModule.validateEnv()).toThrowError(expectedErrorRegex);
@@ -109,7 +111,7 @@ describe('Environment Variable Validation (lib/validateEnv.ts)', () => {
       }
     });
     delete process.env.PINECONE_API_KEY;
-    const expectedErrorRegex = /Missing required environment variable: PINECONE_API_KEY/;
+    const expectedErrorRegex = /Missing required environment variables:.*PINECONE_API_KEY/;
     // Test the exported function directly
     expect(() => validateEnvModule.validateEnv()).toThrowError(expectedErrorRegex);
   });
@@ -121,7 +123,7 @@ describe('Environment Variable Validation (lib/validateEnv.ts)', () => {
       }
     });
     delete process.env.PINECONE_INDEX_NAME;
-    const expectedErrorRegex = /Missing required environment variable: PINECONE_INDEX_NAME/;
+    const expectedErrorRegex = /Missing required environment variables:.*PINECONE_INDEX_NAME/;
     // Test the exported function directly
     expect(() => validateEnvModule.validateEnv()).toThrowError(expectedErrorRegex);
   });
@@ -133,7 +135,7 @@ describe('Environment Variable Validation (lib/validateEnv.ts)', () => {
       }
     });
     delete process.env.PINECONE_ENVIRONMENT;
-    const expectedErrorRegex = /Missing required environment variable: PINECONE_ENVIRONMENT/;
+    const expectedErrorRegex = /Missing required environment variables:.*PINECONE_ENVIRONMENT/;
     // Test the exported function directly
     expect(() => validateEnvModule.validateEnv()).toThrowError(expectedErrorRegex);
   });
@@ -145,7 +147,7 @@ describe('Environment Variable Validation (lib/validateEnv.ts)', () => {
       }
     });
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const expectedErrorRegex = /Missing required environment variable: NEXT_PUBLIC_SUPABASE_URL/;
+    const expectedErrorRegex = /Missing required environment variables:.*NEXT_PUBLIC_SUPABASE_URL/;
     // Test the exported function directly
     expect(() => validateEnvModule.validateEnv()).toThrowError(expectedErrorRegex);
   });
@@ -157,7 +159,7 @@ describe('Environment Variable Validation (lib/validateEnv.ts)', () => {
       }
     });
     delete process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    const expectedErrorRegex = /Missing required environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY/;
+    const expectedErrorRegex = /Missing required environment variables:.*NEXT_PUBLIC_SUPABASE_ANON_KEY/;
     // Test the exported function directly
     expect(() => validateEnvModule.validateEnv()).toThrowError(expectedErrorRegex);
   });
@@ -169,7 +171,7 @@ describe('Environment Variable Validation (lib/validateEnv.ts)', () => {
       }
     });
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const expectedErrorRegex = /Missing required environment variable: SUPABASE_SERVICE_ROLE_KEY/;
+    const expectedErrorRegex = /Missing required environment variables:.*SUPABASE_SERVICE_ROLE_KEY/;
     // Test the exported function directly
     expect(() => validateEnvModule.validateEnv()).toThrowError(expectedErrorRegex);
   });

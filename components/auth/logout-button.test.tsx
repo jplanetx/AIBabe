@@ -1,40 +1,46 @@
+// This mock MUST be at the top, before any imports.
+// The mockSignOut function is defined *inside* the factory.
+jest.mock('@/lib/supabaseClients', () => {
+  const mockSignOutInstance = jest.fn();
+  return {
+    __esModule: true,
+    supabase: {
+      auth: {
+        signOut: mockSignOutInstance,
+      },
+    },
+    createClient: jest.fn(() => ({
+      auth: {
+        signOut: mockSignOutInstance,
+      },
+    })),
+  };
+});
+
 // components/auth/logout-button.test.tsx
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import LogoutButton from './logout-button';
-import { createClient } from '@/lib/supabaseClients'; // Actual import
+// Import the mocked supabase client to access the mock function for tests
+import { supabase } from '@/lib/supabaseClients';
 
 // Mock Next.js router
 const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
-    // Add other router methods if your component uses them
   }),
 }));
-
-// Mock Supabase client
-jest.mock('@/lib/supabaseClients', () => ({
-  createClient: jest.fn(),
-}));
-
-const mockSupabaseClient = createClient as jest.Mock;
 
 // Mock window.alert
 global.alert = jest.fn();
 
 describe('LogoutButton', () => {
-  let mockSignOut: jest.Mock;
+  // Get a reference to the mock function from the mocked module
+  const mockSignOut = supabase.auth.signOut as jest.Mock;
 
   beforeEach(() => {
-    mockSignOut = jest.fn();
-    mockSupabaseClient.mockReturnValue({
-      auth: {
-        signOut: mockSignOut,
-      },
-    });
-    // Reset mocks before each test
     mockSignOut.mockReset();
     mockPush.mockClear();
     (global.alert as jest.Mock).mockClear();

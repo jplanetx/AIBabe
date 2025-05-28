@@ -43,22 +43,26 @@ describe('SignUpPage', () => {
 
   it('renders the sign up form', () => {
     render(<SignUpPage />);
-    expect(screen.getByRole('heading', { name: /sign up/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /join ai girlfriend/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password$/i)).toBeInTheDocument(); // More specific
+    expect(screen.getByLabelText(/confirm password/i)).toBeInTheDocument(); // More specific
     expect(screen.getByRole('button', { name: /sign up/i })).toBeInTheDocument();
   });
 
   it('allows typing in email and password fields', () => {
     render(<SignUpPage />);
     const emailInput = screen.getByLabelText(/email/i) as HTMLInputElement;
-    const passwordInput = screen.getByLabelText(/password/i) as HTMLInputElement;
+    const passwordInput = screen.getByLabelText(/^password$/i) as HTMLInputElement; // More specific
+    const confirmPasswordInput = screen.getByLabelText(/confirm password/i) as HTMLInputElement; // More specific
 
     fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
     fireEvent.change(passwordInput, { target: { value: 'password123' } });
+    fireEvent.change(confirmPasswordInput, { target: { value: 'password123' } });
 
     expect(emailInput.value).toBe('test@example.com');
     expect(passwordInput.value).toBe('password123');
+    expect(confirmPasswordInput.value).toBe('password123');
   });
 
   it('calls /api/auth/register on form submission and displays success message', async () => {
@@ -71,16 +75,19 @@ describe('SignUpPage', () => {
     } as unknown as Response);
  
     render(<SignUpPage />);
+    const testName = 'Test User';
  
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: testName } });
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
-    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: testPassword } }); // More specific
+    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: testPassword } }); // Added confirm
+    fireEvent.submit(screen.getByTestId('signup-form'));
  
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: testEmail, password: testPassword }),
+        body: JSON.stringify({ name: testName, email: testEmail, password: testPassword }),
       });
     });
  
@@ -100,21 +107,24 @@ describe('SignUpPage', () => {
     } as unknown as Response);
 
     render(<SignUpPage />);
+    const testName = 'Existing User';
 
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: testName } });
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
-    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: testPassword } }); // More specific
+    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: testPassword } }); // Added confirm
+    fireEvent.submit(screen.getByTestId('signup-form'));
     
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: testEmail, password: testPassword }),
+        body: JSON.stringify({ name: testName, email: testEmail, password: testPassword }),
       });
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Sign up failed: User already exists')).toBeInTheDocument();
+      expect(screen.getByText('User already exists')).toBeInTheDocument();
     });
   });
 
@@ -130,12 +140,22 @@ describe('SignUpPage', () => {
     } as unknown as Response);
 
     render(<SignUpPage />);
+    const testName = 'Detailed Fail User';
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: testName } });
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
-    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: testPassword } }); // More specific
+    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: testPassword } }); // Added confirm
+    fireEvent.submit(screen.getByTestId('signup-form'));
 
     await waitFor(() => {
-      expect(screen.getByText(`Sign up failed: ${JSON.stringify(errorDetails)}`)).toBeInTheDocument();
+      // We also need to assert mockFetch was called here
+      expect(mockFetch).toHaveBeenCalledWith('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: testName, email: testEmail, password: testPassword }),
+      });
+      // The component formats this error message differently
+      expect(screen.getByText(`Registration failed: ${errorDetails.field} ${errorDetails.issue}`)).toBeInTheDocument();
     });
   });
 
@@ -146,12 +166,21 @@ describe('SignUpPage', () => {
     mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
     render(<SignUpPage />);
+    const testName = 'Network Error User';
+    fireEvent.change(screen.getByLabelText(/full name/i), { target: { value: testName } });
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
-    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: testPassword } }); // More specific
+    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: testPassword } }); // Added confirm
+    fireEvent.submit(screen.getByTestId('signup-form'));
     
     await waitFor(() => {
-      expect(screen.getByText('Sign up failed due to a network or unexpected error. Please try again.')).toBeInTheDocument();
+      // We also need to assert mockFetch was called here
+      expect(mockFetch).toHaveBeenCalledWith('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: testName, email: testEmail, password: testPassword }),
+      });
+      expect(screen.getByText('An unexpected error occurred. Please try again.')).toBeInTheDocument();
     });
   });
 });

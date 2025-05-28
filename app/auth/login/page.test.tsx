@@ -50,10 +50,10 @@ describe('LoginPage', () => {
 
   it('renders the login form', () => {
     render(<LoginPage />);
-    expect(screen.getByRole('heading', { name: /login/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /welcome back/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /login/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
   it('allows typing in email and password fields', () => {
@@ -80,7 +80,7 @@ describe('LoginPage', () => {
 
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
     fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
-    fireEvent.click(screen.getByRole('button', { name: /login/i }));
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', {
@@ -98,7 +98,7 @@ describe('LoginPage', () => {
       expect(mockRefresh).toHaveBeenCalledTimes(1);
     });
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+      expect(mockPush).toHaveBeenCalledWith('/onboarding'); // Changed from /dashboard
     });
   });
 
@@ -115,7 +115,7 @@ describe('LoginPage', () => {
 
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
     fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
-    fireEvent.click(screen.getByRole('button', { name: /login/i }));
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
     
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith('/api/auth/login', {
@@ -144,7 +144,7 @@ describe('LoginPage', () => {
     render(<LoginPage />);
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
     fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
-    fireEvent.click(screen.getByRole('button', { name: /login/i }));
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
       expect(screen.getByText(`Login failed: ${JSON.stringify(errorDetails)}`)).toBeInTheDocument();
@@ -161,7 +161,7 @@ describe('LoginPage', () => {
 
     fireEvent.change(screen.getByLabelText(/email/i), { target: { value: testEmail } });
     fireEvent.change(screen.getByLabelText(/password/i), { target: { value: testPassword } });
-    fireEvent.click(screen.getByRole('button', { name: /login/i }));
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Login failed due to a network or unexpected error. Please try again.')).toBeInTheDocument();
