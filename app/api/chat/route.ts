@@ -1,9 +1,11 @@
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs'; // Changed from edge to support Pinecone SDK
 
 import { NextRequest, NextResponse } from 'next/server';
-import { OpenAIStream, StreamingTextResponse } from 'ai'; // Assuming this is correct as per documentation
+import { streamText } from 'ai'; // Vercel AI SDK v4+
+import { openai } from '@ai-sdk/openai'; // Vercel AI SDK v4+ OpenAI provider
 // import OpenAI from 'openai'; // REMOVED - Will use getOpenAIClient
-import { getOpenAIClient } from '@/lib/openaiClient'; // ADDED
+import { getOpenAIClient } from '@/lib/openaiClient'; // This is for the 'openai' package, may still be used by non-streaming path
 import { db } from "@/lib/db";
 import { Conversation, Message, PrismaClient } from '@prisma/client'; // PrismaClient might be redundant if db is typed
 import { getChatCompletion, createPersonaPrompt, type ChatMessage } from '@/lib/llm_service';
@@ -223,37 +225,39 @@ if (currentConversationId && !currentConversationId.startsWith('new-')) {
     messagesForLLM.push({ role: 'user', content: userMessageContent });
 
     if (streaming) {
-      const openai = getOpenAIClient(); // Initialize client here for streaming path
-      console.log('POST /api/chat: Starting stream for AI response...');
-      const llmStream = await openai.chat.completions.create({
-        model: DEFAULT_LLM_MODEL,
+      console.log('POST /api/chat: Starting stream for AI response using streamText (Vercel AI SDK v4+)...');
+      
+      const result = await streamText({
+        model: openai(DEFAULT_LLM_MODEL),
         messages: messagesForLLM as any, 
         temperature: DEFAULT_LLM_TEMPERATURE,
-        max_tokens: DEFAULT_LLM_MAX_TOKENS,
-        stream: true,
-      });
-
-      const vercelAIStream = OpenAIStream(llmStream, {
-        async onCompletion(completion: string) { 
-          if (completion.trim().length > 0) {
+        maxTokens: DEFAULT_LLM_MAX_TOKENS,
+        async onFinish({ text: completion, usage, finishReason }) {
+          // 'text' is the full completion. 'usage' and 'finishReason' are also available.
+          if (completion && completion.trim().length > 0) {
             try {
               const savedAIMessage = await saveMessage(userId, finalConversationId, completion, false, db);
-              console.log('POST /api/chat (stream onCompletion): Saved AI response:', savedAIMessage.id);
+              console.log('POST /api/chat (stream onFinish): Saved AI response:', savedAIMessage.id);
               await db.conversation.update({
                 where: { id: finalConversationId },
                 data: { updatedAt: new Date() }
               });
-              console.log('POST /api/chat (stream onCompletion): Updated conversation timestamp.');
-              ingestMessageToVectorDB(savedUserMessage.id, finalConversationId, userId, userMessageContent, savedUserMessage.createdAt).catch(e => console.error('VecDB user ingest error (stream):', e.message));
-              ingestMessageToVectorDB(savedAIMessage.id, finalConversationId, userId, completion, savedAIMessage.createdAt).catch(e => console.error('VecDB AI ingest error (stream):', e.message));
+              console.log('POST /api/chat (stream onFinish): Updated conversation timestamp.');
+              ingestMessageToVectorDB(savedUserMessage.id, finalConversationId, userId, userMessageContent, savedUserMessage.createdAt).catch(e => console.error('VecDB user ingest error (stream onFinish):', e.message));
+              ingestMessageToVectorDB(savedAIMessage.id, finalConversationId, userId, completion, savedAIMessage.createdAt).catch(e => console.error('VecDB AI ingest error (stream onFinish):', e.message));
             } catch (dbError: any) {
-              console.error('POST /api/chat (stream onCompletion): Error in DB operations:', dbError.message);
+              console.error('POST /api/chat (stream onFinish): Error in DB operations:', dbError.message);
             }
+          } else {
+            console.log('POST /api/chat (stream onFinish): Completion was empty or undefined, nothing to save. Reason:', finishReason);
           }
         }
       });
-      return new StreamingTextResponse(vercelAIStream, { headers: res.headers });
+      
+      const responseHeaders = new Headers(res.headers); // Create new Headers object from existing ones
+      responseHeaders.set('Content-Type', 'text/plain; charset=utf-8'); // Correctly set Content-Type
 
+      return new Response(result.textStream, { headers: responseHeaders });
     } else {
       console.log('POST /api/chat: Generating non-streaming AI response...');
       // getChatCompletion should internally use the getOpenAIClient() or be passed the client
