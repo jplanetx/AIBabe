@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
         data: {
           id: data.user.id, // Use the ID from Supabase Auth
           email: data.user.email,
-          name: name, // Use the name from the validated request data
+          name: name ?? null, // avoid undefined → runtime error
         },
       });
       console.log('User record created in public schema:', newUserInDb);

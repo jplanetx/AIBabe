@@ -150,6 +150,18 @@ export async function POST(request: NextRequest) {
 
     console.log('POST /api/chat: Saved user message:', userMessage.id);
 
+    // Determine the effective character ID for persona loading
+    const effectiveCharacterId = conversation.girlfriendId || characterId;
+
+    // Validate that a persona identifier is available
+    if (!effectiveCharacterId) {
+      console.warn('POST /api/chat: Missing characterId. Neither conversation.girlfriendId nor request body characterId is present.');
+      return NextResponse.json({
+        success: false,
+        error: 'Missing character identifier. Please provide a characterId or ensure the conversation is linked to a persona.'
+      }, { status: 400 });
+    }
+
     // Get semantic context from vector database
     const semanticContext = await getConversationContext(
       conversation.id,
@@ -159,7 +171,6 @@ export async function POST(request: NextRequest) {
     );
 
     // Get character/persona information
-    const effectiveCharacterId = conversation?.girlfriendId || characterId;
     const persona: Persona = await getPersonaDetails(effectiveCharacterId);
 
     // Build enhanced context for smart prompting

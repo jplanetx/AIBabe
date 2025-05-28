@@ -1,10 +1,11 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { OpenAIStream, StreamingTextResponse } from 'ai';
-import OpenAI from 'openai';
+import { OpenAIStream, StreamingTextResponse } from 'ai'; // Assuming this is correct as per documentation
+// import OpenAI from 'openai'; // REMOVED - Will use getOpenAIClient
+import { getOpenAIClient } from '@/lib/openaiClient'; // ADDED
 import { db } from "@/lib/db";
-import { Conversation, Message, PrismaClient } from '@prisma/client';
+import { Conversation, Message, PrismaClient } from '@prisma/client'; // PrismaClient might be redundant if db is typed
 import { getChatCompletion, createPersonaPrompt, type ChatMessage } from '@/lib/llm_service';
 import { ingestMessageToVectorDB } from '@/lib/vector_db';
 import {
@@ -22,10 +23,7 @@ import {
 } from '@/lib/chatUtils';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
+const openai = getOpenAIClient(); // CHANGED - Use the singleton client
 
 export async function GET(request: NextRequest) {
   console.log('GET /api/chat: Received request');
@@ -62,7 +60,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ 
         success: false, 
         error: 'Authentication error' 
-      }, { status: 500 });
+      }, { status: 500, headers: response.headers });
     }
     
     if (!session) {
@@ -70,7 +68,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ 
         success: false, 
         error: 'Unauthorized - Please log in' 
-      }, { status: 401 });
+      }, { status: 401, headers: response.headers });
     }
 
     const userId = session.user.id;
@@ -98,14 +96,14 @@ export async function GET(request: NextRequest) {
     }));
 
     console.log('GET /api/chat: Responding with chat history');
-    return NextResponse.json({ success: true, data: chatHistory });
+    return NextResponse.json({ success: true, data: chatHistory }, { headers: response.headers });
 
   } catch (error) {
     console.error('GET /api/chat: Error -', error);
     return NextResponse.json({ 
       success: false, 
       error: 'Failed to fetch chat history' 
-    }, { status: 500 });
+    }, { status: 500, headers: response.headers });
   }
 }
 
@@ -115,7 +113,7 @@ export async function POST(request: NextRequest) {
   const streaming = request.nextUrl.searchParams.get('stream') === 'true';
   console.log('POST /api/chat: Streaming mode:', streaming);
 
-  const res = NextResponse.next({ // Renamed to avoid conflict with 'response' variable name if used later
+  const res = NextResponse.next({ 
     request: {
       headers: request.headers,
     },
@@ -139,17 +137,16 @@ export async function POST(request: NextRequest) {
     }
   );
   
-  // 1. Authentication & Authorization
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
   if (sessionError) {
     console.error('POST /api/chat: Error getting session:', sessionError.message);
-    return NextResponse.json({ success: false, error: 'Authentication error', details: sessionError.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: 'Authentication error', details: sessionError.message }, { status: 500, headers: res.headers });
   }
   
   if (!session) {
     console.log('POST /api/chat: No authenticated session');
-    return NextResponse.json({ success: false, error: 'Unauthorized - Please log in' }, { status: 401 });
+    return NextResponse.json({ success: false, error: 'Unauthorized - Please log in' }, { status: 401, headers: res.headers });
   }
 
   const userId = session.user.id;
@@ -160,7 +157,7 @@ export async function POST(request: NextRequest) {
     const { message: userMessageContent, conversationId: currentConversationId, characterId } = body;
 
     if (!userMessageContent || typeof userMessageContent !== 'string' || userMessageContent.trim().length === 0) {
-      return NextResponse.json({ success: false, error: 'Message is required and must be a non-empty string' }, { status: 400 });
+      return NextResponse.json({ success: false, error: 'Message is required and must be a non-empty string' }, { status: 400, headers: res.headers });
     }
 
     console.log('POST /api/chat: Processing message:', { 
@@ -173,12 +170,12 @@ export async function POST(request: NextRequest) {
     let conversation: Conversation;
     let isNewConversation = false;
 
-    if (currentConversationId && currentConversationId !== 'new-' + (currentConversationId.split('-')[1] || characterId)) {
+if (conversationId && !conversationId.startsWith('new-')) {
       const existingConversation = await db.conversation.findFirst({
         where: { id: currentConversationId, userId: userId }
       });
       if (!existingConversation) {
-        return NextResponse.json({ success: false, error: 'Conversation not found or access denied' }, { status: 404 });
+        return NextResponse.json({ success: false, error: 'Conversation not found or access denied' }, { status: 404, headers: res.headers });
       }
       conversation = existingConversation;
     } else {
@@ -186,8 +183,7 @@ export async function POST(request: NextRequest) {
       const personaForNewConv = await getPersonaDetails(characterId);
       conversation = await db.conversation.create({
         data: {
-          userId: userId, // Scalar foreign key
-          // user: { connect: { id: userId } }, // Prisma infers this from userId if schema is set up correctly
+          userId: userId, 
           girlfriendId: personaForNewConv.id 
         }
       });
@@ -205,7 +201,7 @@ export async function POST(request: NextRequest) {
     try {
       const [sentimentResult, memoryResult] = await Promise.all([
         analyzeSentiment(userMessageContent),
-        getRelevantMemory(userId, finalConversationId, userMessageContent) // Using finalConversationId
+        getRelevantMemory(userId, finalConversationId, userMessageContent)
       ]);
       sentiment = sentimentResult;
       relevantMemoryItems = memoryResult;
@@ -227,7 +223,7 @@ export async function POST(request: NextRequest) {
 
     if (streaming) {
       console.log('POST /api/chat: Starting stream for AI response...');
-      const llmStream = await openai.chat.completions.create({
+      const llmStream = await openai.chat.completions.create({ // openai is now from getOpenAIClient()
         model: DEFAULT_LLM_MODEL,
         messages: messagesForLLM as any, 
         temperature: DEFAULT_LLM_TEMPERATURE,
@@ -236,7 +232,7 @@ export async function POST(request: NextRequest) {
       });
 
       const vercelAIStream = OpenAIStream(llmStream, {
-        async onCompletion(completion: string) { // Added type for completion
+        async onCompletion(completion: string) { 
           if (completion.trim().length > 0) {
             try {
               const savedAIMessage = await saveMessage(userId, finalConversationId, completion, false, db);
@@ -246,7 +242,6 @@ export async function POST(request: NextRequest) {
                 data: { updatedAt: new Date() }
               });
               console.log('POST /api/chat (stream onCompletion): Updated conversation timestamp.');
-              // Asynchronously ingest messages to vector DB
               ingestMessageToVectorDB(savedUserMessage.id, finalConversationId, userId, userMessageContent, savedUserMessage.createdAt).catch(e => console.error('VecDB user ingest error (stream):', e.message));
               ingestMessageToVectorDB(savedAIMessage.id, finalConversationId, userId, completion, savedAIMessage.createdAt).catch(e => console.error('VecDB AI ingest error (stream):', e.message));
             } catch (dbError: any) {
@@ -255,10 +250,13 @@ export async function POST(request: NextRequest) {
           }
         }
       });
-      return new StreamingTextResponse(vercelAIStream);
+      return new StreamingTextResponse(vercelAIStream, { headers: res.headers });
 
     } else {
       console.log('POST /api/chat: Generating non-streaming AI response...');
+      // getChatCompletion should internally use the getOpenAIClient() or be passed the client
+      // For now, assuming getChatCompletion handles its OpenAI client dependency.
+      // If getChatCompletion also instantiates its own client, it would need similar refactoring.
       const aiResponseContent = await getChatCompletion(messagesForLLM, {
         model: DEFAULT_LLM_MODEL,
         temperature: DEFAULT_LLM_TEMPERATURE,
@@ -267,7 +265,7 @@ export async function POST(request: NextRequest) {
 
       if (!aiResponseContent) {
         console.error('POST /api/chat: AI response content is null or empty.');
-        return NextResponse.json({ success: false, error: 'AI service failed to generate a response.' }, { status: 502 });
+        return NextResponse.json({ success: false, error: 'AI service failed to generate a response.' }, { status: 502, headers: res.headers });
       }
 
       const savedAIMessage = await saveMessage(userId, finalConversationId, aiResponseContent, false, db);
@@ -295,7 +293,7 @@ export async function POST(request: NextRequest) {
           personaUsed: persona.name,
           isNewConversation
         } 
-      });
+      }, { headers: res.headers });
     }
 
   } catch (error: any) {
@@ -323,6 +321,6 @@ export async function POST(request: NextRequest) {
       success: false, 
       error: errorMessage,
       details: errorDetails
-    }, { status });
+    }, { status, headers: res.headers });
   }
 }
