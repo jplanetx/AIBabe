@@ -30,6 +30,8 @@ model User {
   feedbacks     Feedback[]
   memories      Memory[]
   userProfile   UserProfile?
+userFacts               UserFact[]
+  userSemanticPreferences UserSemanticPreference[]
 }
 
 model Girlfriend {
@@ -152,6 +154,45 @@ model UserProfile {
   updatedAt       DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+// Enum for Semantic Preference Types
+enum SemanticPreferenceType {
+  TONE
+  TOPIC_AVOIDANCE
+  INFO_DEPTH
+  OTHER
+}
+
+// Model for storing user-specific facts for semantic memory
+model UserFact {
+  id        String   @id @default(cuid()) // Corresponds to fact_id and Pinecone vector ID
+  userId    String   // Foreign key to User model
+  factText  String   @db.Text // The actual text of the fact
+  // embedding field is not stored here; its ID is this model's id, vector stored in Pinecone
+  sourceSessionId String?  // ID of the session where the fact was stated
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Model for storing user-specific preferences for semantic memory
+model UserSemanticPreference {
+  id              String                 @id @default(cuid()) // Corresponds to preference_id and Pinecone vector ID
+  userId          String                 // Foreign key to User model
+  preferenceType  SemanticPreferenceType // Type of preference (e.g., TONE, TOPIC_AVOIDANCE)
+  preferenceValue String                 // Value of the preference
+  // embedding field is not stored here; its ID is this model's id, vector stored in Pinecone
+  sourceSessionId String?                // ID of the session where the preference was stated
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, preferenceType]) // A user might have one value per preference type for simplicity, can be relaxed if needed
+  @@index([userId])
 }
 
 model Profile {
