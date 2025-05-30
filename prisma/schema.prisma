@@ -1,83 +1,76 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-  provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
+  provider     = "prisma-client-js"
+  output       = "../node_modules/.prisma/client"
   relationMode = "prisma"
 }
 
-// Load environment variables
-// @ts-ignore
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")   // Your application's URL (6543)
-  directUrl = env("DIRECT_URL")   // Prisma CLI's URL (5432)
-  referentialIntegrity = "prisma"
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  directUrl         = env("DIRECT_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+  relationMode      = "prisma"
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String           @id @default(cuid())
   name          String?
-  email         String?   @unique
-  // password      String? // Removed as Supabase Auth handles passwords
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  email         String?          @unique
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  password      String?
   conversations Conversation[]
   subscription  Subscription?
   preferences   UserPreference[]
   feedbacks     Feedback[]
   memories      Memory[]
   userProfile   UserProfile?
-userFacts               UserFact[]
-  userSemanticPreferences UserSemanticPreference[]
 }
 
 model Girlfriend {
-  id           String    @id @default(cuid())
-  name         String
-  description  String
-  personality  String
-  imageUrl     String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id            String         @id @default(cuid())
+  name          String
+  description   String
+  personality   String
+  imageUrl      String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
   conversations Conversation[]
 }
 
 model Character {
-  id           String    @id @default(cuid())
-  name         String
-  description  String
-  personality  String
-  image        String
-  coverImage   String?
-  bio          String
-  interests    String?
+  id            String   @id @default(cuid())
+  name          String
+  description   String
+  personality   String
+  image         String
+  coverImage    String?
+  bio           String
+  interests     String?
   favoriteQuote String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model Conversation {
-  id           String    @id @default(cuid())
+  id           String               @id @default(cuid())
   userId       String
-  girlfriendId String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  girlfriendId String
   messages     Message[]
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  girlfriend   Girlfriend? @relation(fields: [girlfriendId], references: [id], onDelete: Cascade)
-  summary      ConversationSummary? // Relation to ConversationSummary model
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  girlfriend   Girlfriend?          @relation(fields: [girlfriendId], references: [id], onDelete: Cascade)
+  summary      ConversationSummary?
   feedbacks    Feedback[]
 }
 
 model Message {
-  id             String    @id @default(cuid())
+  id             String       @id @default(cuid())
+  conversationId String
+  createdAt      DateTime     @default(now())
   content        String
   isUserMessage  Boolean
-  conversationId String
-  createdAt      DateTime  @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
 
@@ -85,118 +78,75 @@ model Subscription {
   id        String    @id @default(cuid())
   userId    String    @unique
   plan      String    @default("FREE")
-  startDate DateTime  @default(now())
-  endDate   DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  endDate   DateTime?
+  startDate DateTime  @default(now())
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Memory {
-  id           String    @id @default(cuid())
-  key          String
-  value        String
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
   conversationId String
-  userId       String
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key            String
+  value          String
+  userId         String?
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([key, conversationId])
 }
 
 model UserPreference {
   id        String   @id @default(cuid())
-  userId    String   // Foreign key to User model
-  key       String   // Preference key (e.g., "communication_style", "preferred_name")
-  value     String   // Preference value
+  userId    String
+  key       String
+  value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, key]) // Ensures a user has only one value per preference key
+  @@unique([userId, key])
 }
 
 model ConversationSummary {
-  id             String   @id @default(cuid())
-  conversationId String   @unique // Foreign key to Conversation model, unique because one summary per convo
-  summary        String   @db.Text // Use Text type for potentially long summaries
-  summarizedAt   DateTime @default(now()) // Timestamp of when the summary was generated
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  conversationId String       @unique
+  summary        String
+  summarizedAt   DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }
 
 model Feedback {
-  id              String    @id @default(cuid())
+  id              String       @id @default(cuid())
   conversationId  String
-  userId          String?   // Optional: if feedback can be anonymous or system-generated
-  rating          Int       // e.g., 1-5 for stars, or specific values for thumbs up/down
+  userId          String?
+  rating          Int
   optionalComment String?
-  createdAt       DateTime  @default(now())
-
+  createdAt       DateTime     @default(now())
   conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user            User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([conversationId])
   @@index([userId])
 }
+
 model UserProfile {
   id              String   @id @default(cuid())
   userId          String   @unique
-  profileData     String   @db.Text // JSON string containing the full UserProfile data
+  profileData     String
   lastUpdated     DateTime @default(now())
   confidenceScore Float    @default(0.5)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-// Enum for Semantic Preference Types
-enum SemanticPreferenceType {
-  TONE
-  TOPIC_AVOIDANCE
-  INFO_DEPTH
-  OTHER
-}
-
-// Model for storing user-specific facts for semantic memory
-model UserFact {
-  id        String   @id @default(cuid()) // Corresponds to fact_id and Pinecone vector ID
-  userId    String   // Foreign key to User model
-  factText  String   @db.Text // The actual text of the fact
-  // embedding field is not stored here; its ID is this model's id, vector stored in Pinecone
-  sourceSessionId String?  // ID of the session where the fact was stated
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-// Model for storing user-specific preferences for semantic memory
-model UserSemanticPreference {
-  id              String                 @id @default(cuid()) // Corresponds to preference_id and Pinecone vector ID
-  userId          String                 // Foreign key to User model
-  preferenceType  SemanticPreferenceType // Type of preference (e.g., TONE, TOPIC_AVOIDANCE)
-  preferenceValue String                 // Value of the preference
-  // embedding field is not stored here; its ID is this model's id, vector stored in Pinecone
-  sourceSessionId String?                // ID of the session where the preference was stated
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, preferenceType]) // A user might have one value per preference type for simplicity, can be relaxed if needed
-  @@index([userId])
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Profile {
-  id        String   @id // Stores Supabase auth.users.id (UUID)
+  id        String   @id
   email     String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

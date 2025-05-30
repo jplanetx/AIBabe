@@ -1,30 +1,32 @@
-import { PrismaClient, UserFact, UserSemanticPreference } from '@prisma/client';
-import { Pinecone, Index as PineconeIndex } from '@pinecone-database/pinecone';
-import prisma from './prismaClient'; // Assuming this is the global Prisma client instance
-import { pinecone } from './pineconeClient'; // Assuming this is the initialized Pinecone client
+import { PrismaClient, UserFact, UserSemanticPreference, SemanticPreferenceType } from '@prisma/client';
+import { Pinecone, Index as PineconeIndex, RecordMetadata } from '@pinecone-database/pinecone';
+import { prisma } from './prismaClient'; // Corrected import
+import { getPineconeClient } from './pineconeClient'; // Corrected import
 
 // Environment variables for semantic memory
 const PINECONE_SEMANTIC_NAMESPACE = process.env.PINECONE_SEMANTIC_NAMESPACE || 'semantic-memory';
 const PINECONE_INDEX_NAME = process.env.PINECONE_INDEX_NAME; // This should be set in .env
 
-let semanticMemoryPineconeIndex: PineconeIndex | null = null;
+let semanticMemoryPineconeIndex: PineconeIndex<RecordMetadata> | null = null;
 
 /**
  * Initializes and returns the Pinecone index for semantic memory.
  * Includes a basic connection check by describing index stats.
- * @returns {Promise<PineconeIndex>} The Pinecone index instance.
+ * @returns {Promise<PineconeIndex<RecordMetadata>>} The Pinecone index instance.
  * @throws {Error} If Pinecone index name is not configured or connection fails.
  */
-async function getSemanticMemoryPineconeIndex(): Promise<PineconeIndex> {
+async function getSemanticMemoryPineconeIndex(): Promise<PineconeIndex<RecordMetadata>> {
   if (!PINECONE_INDEX_NAME) {
     throw new Error('Pinecone index name (PINECONE_INDEX_NAME) is not configured in environment variables.');
   }
   if (semanticMemoryPineconeIndex) {
-    return semanticMemoryPineconeIndex;
+    // Type assertion, as we've checked for null and it would have thrown or returned earlier if still null.
+    return semanticMemoryPineconeIndex as PineconeIndex<RecordMetadata>;
   }
 
   try {
-    const index = pinecone.Index(PINECONE_INDEX_NAME);
+    const pinecone = getPineconeClient(); // Get the initialized Pinecone client
+    const index = pinecone.Index<RecordMetadata>(PINECONE_INDEX_NAME);
     // Basic connection check by fetching index stats
     await index.describeIndexStats();
     console.log(`Successfully connected to Pinecone index: ${PINECONE_INDEX_NAME} for semantic memory.`);
@@ -42,11 +44,10 @@ async function getSemanticMemoryPineconeIndex(): Promise<PineconeIndex> {
  */
 async function checkPrismaConnection(): Promise<void> {
   try {
-    await prisma.$connect(); // Explicitly connect
-    // Perform a simple query to ensure the connection is live
+    // Prisma client from './prismaClient' is already connected or manages its connection pool.
+    // A simple query can verify its readiness.
     await prisma.user.findFirst({ select: { id: true } }); // Example query
     console.log('Successfully connected to Prisma for semantic memory operations.');
-    // No need to $disconnect if Prisma client is managed globally as a singleton
   } catch (error) {
     console.error('Prisma connection check failed for semantic memory store:', error);
     throw new Error(`Prisma connection failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -67,7 +68,7 @@ export async function initializeSemanticMemoryStore(): Promise<void> {
 
 // Placeholder for future CRUD operations using Prisma and Pinecone for semantic memory
 // Example:
-// export async function createUserFact(userId: string, factText: string, embedding: number[]): Promise<UserFact> {
+// export async function createUserFactInStore(userId: string, factText: string, embedding: number[]): Promise<UserFact> {
 //   const prismaFact = await prisma.userFact.create({
 //     data: {
 //       userId,
@@ -80,14 +81,15 @@ export async function initializeSemanticMemoryStore(): Promise<void> {
 //     {
 //       id: prismaFact.id,
 //       values: embedding,
-//       metadata: {
+//       metadata: { // Adhering to docs/schemas/semantic_memory_schema.json
 //         vectorId: prismaFact.id,
 //         userId,
 //         type: 'fact',
 //         text: factText,
 //         timestamp: new Date().toISOString(),
-//         // ... other metadata from docs/schemas/semantic_memory_schema.json
-//       },
+//         // preferenceType: null, // For facts
+//         // preferenceValue: null, // For facts
+//       } as RecordMetadata, // Cast to RecordMetadata or a more specific type if defined
 //     },
 //   ]);
 //   return prismaFact;
