@@ -1,11 +1,23 @@
 /*
   Warnings:
 
-  - Added the required column `userId` to the `Memory` table without a default value. This is not possible if the table is not empty.
+  - The original migration attempted to add a non-nullable `userId` column to the `Memory` table
+    without a default value. This would fail if the `Memory` table already contains data.
+  - To address this, the `userId` column is now added as nullable.
+
+  - IMPORTANT POST-MIGRATION STEPS:
+  - 1. If there are existing rows in the "Memory" table, you MUST populate the "userId"
+  -    field for these rows with valid User IDs.
+  - 2. After ensuring all "userId" fields are populated, create and apply a NEW migration
+  -    to alter the "userId" column to be NOT NULL.
+  -    Example SQL for the new migration:
+  -    ALTER TABLE "Memory" ALTER COLUMN "userId" SET NOT NULL;
+  -    Alternatively, update your Prisma schema to ensure `userId` is non-nullable on `Memory`
+  -    and `prisma migrate dev` will generate the necessary ALTER statement.
 
 */
 -- AlterTable
-ALTER TABLE "Memory" ADD COLUMN     "userId" TEXT NOT NULL;
+ALTER TABLE "Memory" ADD COLUMN     "userId" TEXT; -- Changed from NOT NULL to allow NULL initially
 
 -- CreateTable
 CREATE TABLE "Character" (

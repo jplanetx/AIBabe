@@ -24,6 +24,7 @@ import {
   saveMessage
 } from '@/lib/chatUtils';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { supabase } from '@/lib/supabaseClients';
 
 // const openai = getOpenAIClient(); // MOVED inside POST to ensure mock is ready for streaming
 // REMOVED: openai client will be initialized within POST as needed
@@ -229,7 +230,7 @@ if (currentConversationId && !currentConversationId.startsWith('new-')) {
       
       const result = await streamText({
         model: openai(DEFAULT_LLM_MODEL),
-        messages: messagesForLLM as any, 
+        messages: messagesForLLM as ChatMessage[],
         temperature: DEFAULT_LLM_TEMPERATURE,
         maxTokens: DEFAULT_LLM_MAX_TOKENS,
         async onFinish({ text: completion, usage, finishReason }) {

@@ -1,150 +1,92 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { supabase } from '../../../lib/supabaseClients'; // Adjusted path
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [message, setMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = async (event: React.FormEvent) => {
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setMessage('');
-    setIsLoading(true);
-    console.log('Attempting login via API with:', { email, password });
+    setLoading(true);
+    setError(null);
 
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Handle errors from the API route
-        const errorDetails = data.details ? JSON.stringify(data.details) : data.error;
-        setMessage(`Login failed: ${errorDetails || response.statusText}`);
-        console.error('Login error from API:', data);
-      } else {
-        setMessage(data.message || 'Login successful!');
-        console.log('Login successful via API, user:', data.user);
-        
-        // Check if user has completed onboarding
-        try {
-          const profileResponse = await fetch('/api/user/profile');
-          const profileData = await profileResponse.json();
-          
-          if (profileResponse.ok && profileData.success && profileData.data) {
-            // User has completed onboarding, redirect to chat
-            router.refresh();
-            router.push('/chat');
-          } else {
-            // User hasn't completed onboarding, redirect to onboarding
-            router.refresh();
-            router.push('/onboarding');
-          }
-        } catch (error) {
-          console.error('Error checking user profile:', error);
-          // Default to onboarding if we can't check profile
-          router.refresh();
-          router.push('/onboarding');
-        }
-      }
-    } catch (error) {
-      console.error('Network or other error during login:', error);
-      setMessage('Login failed due to a network or unexpected error. Please try again.');
-    } finally {
-      setIsLoading(false);
+    if (signInError) {
+      setError(signInError.message);
+    } else if (data.session) {
+      // Successful login
+      router.push('/chat'); // Redirect to chat page or any authenticated route
+    } else {
+      // Should not happen if signInError is null and no session, but as a fallback
+      setError('An unexpected error occurred. Please try again.');
     }
+    setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-900 via-purple-900 to-indigo-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Welcome Back</h1>
-          <p className="text-gray-300">Sign in to your account</p>
-        </div>
-        
-        <form onSubmit={handleLogin} className="max-w-400 mx-auto p-8 bg-white bg-opacity-5 rounded-xl backdrop-blur-lg border border-white border-opacity-10">
-          <div className="mb-6">
-            <label htmlFor="email" className="block mb-2 font-medium text-white text-sm">
-              Email:
-            </label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email address"
-              required
-              className="w-full p-3 mt-2 border-2 border-white border-opacity-20 rounded-lg bg-white bg-opacity-10 text-white text-base transition-all duration-300 ease-in-out focus:outline-none focus:border-pink-500 focus:bg-white focus:bg-opacity-15 focus:text-gray-900 focus:shadow-lg placeholder-white placeholder-opacity-60 focus:placeholder-gray-500"
-            />
-          </div>
-          <div className="mb-6">
-            <label htmlFor="password" className="block mb-2 font-medium text-white text-sm">
-              Password:
-            </label>
-            <input
-              type="password"
-              id="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter your password"
-              required
-              className="w-full p-3 mt-2 border-2 border-white border-opacity-20 rounded-lg bg-white bg-opacity-10 text-white text-base transition-all duration-300 ease-in-out focus:outline-none focus:border-pink-500 focus:bg-white focus:bg-opacity-15 focus:text-gray-900 focus:shadow-lg placeholder-white placeholder-opacity-60 focus:placeholder-gray-500"
-            />
-          </div>
-          <button 
-            type="submit"
-            disabled={isLoading}
-            className="w-full p-4 mt-4 bg-gradient-to-r from-pink-500 to-pink-700 text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-all duration-300 ease-in-out flex items-center justify-center gap-2 hover:from-pink-700 hover:to-pink-900 hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            {isLoading ? (
-              <span className="flex items-center gap-2">
-                <span className="w-4 h-4 border-2 border-white border-opacity-30 border-t-white rounded-full animate-spin inline-block"></span>
-                Signing in...
-              </span>
-            ) : (
-              'Sign In'
+    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center">Login</CardTitle>
+          <CardDescription className="text-center">
+            Enter your credentials to access your account.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                required
+                disabled={loading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                disabled={loading}
+              />
+            </div>
+            {error && (
+              <div role="alert" className="p-3 text-sm text-red-700 bg-red-100 border border-red-400 rounded-md">
+                {error}
+              </div>
             )}
-          </button>
-          
-          {message && (
-            <p className={`mt-4 text-center ${message.includes('failed') ? 'text-red-400' : 'text-green-400'}`}>
-              {message}
-            </p>
-          )}
-          
-          <div className="mt-4 text-center space-y-2">
-            <p className="text-gray-300 text-sm">
-              <Link 
-                href="/auth/reset-password" 
-                className="text-pink-400 no-underline font-medium hover:underline"
-              >
-                Forgot your password?
-              </Link>
-            </p>
-            <p className="text-gray-300 text-sm">
-              Don't have an account?{' '}
-              <Link 
-                href="/auth/signup" 
-                className="text-pink-400 no-underline font-medium hover:underline"
-              >
-                Sign up here
-              </Link>
-            </p>
-          </div>
-        </form>
-      </div>
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Logging in...' : 'Login'}
+            </Button>
+          </form>
+        </CardContent>
+        <CardFooter className="text-sm text-center">
+          {/* Optional: Add link to registration page or password reset */}
+          {/* <p>Don't have an account? <a href="/auth/register" className="text-blue-600 hover:underline">Sign up</a></p> */}
+        </CardFooter>
+      </Card>
     </div>
   );
 }

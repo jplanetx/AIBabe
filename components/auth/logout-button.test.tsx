@@ -1,86 +1,97 @@
-// This mock MUST be at the top, before any imports.
-// The mockSignOut function is defined *inside* the factory.
-jest.mock('@/lib/supabaseClients', () => {
-  const mockSignOutInstance = jest.fn();
-  return {
-    __esModule: true,
-    supabase: {
-      auth: {
-        signOut: mockSignOutInstance,
-      },
-    },
-    createClient: jest.fn(() => ({
-      auth: {
-        signOut: mockSignOutInstance,
-      },
-    })),
-  };
-});
-
-// components/auth/logout-button.test.tsx
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import LogoutButton from './logout-button';
-// Import the mocked supabase client to access the mock function for tests
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClients';
+import LogoutButton from './logout-button'; // Assuming the component will be in the same directory
 
-// Mock Next.js router
-const mockPush = jest.fn();
+// Mock next/navigation
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: mockPush,
-  }),
+  useRouter: jest.fn(),
 }));
 
-// Mock window.alert
-global.alert = jest.fn();
+// Mock supabase client
+jest.mock('@/lib/supabaseClients', () => ({
+  supabase: {
+    auth: {
+      signOut: jest.fn(),
+    },
+  },
+}));
+
+// Mock ShadCN UI Button (or any UI library button used)
+jest.mock('@/components/ui/button', () => ({
+  __esModule: true,
+  Button: ({ onClick, children }: { onClick: React.MouseEventHandler<HTMLButtonElement>; children: React.ReactNode }) => (
+    <button onClick={onClick} data-testid="logout-button-mock">{children}</button>
+  ),
+}));
+
 
 describe('LogoutButton', () => {
-  // Get a reference to the mock function from the mocked module
-  const mockSignOut = supabase.auth.signOut as jest.Mock;
+  let mockRouterPush: jest.Mock;
+  let mockConsoleError: jest.SpyInstance;
 
   beforeEach(() => {
-    mockSignOut.mockReset();
-    mockPush.mockClear();
-    (global.alert as jest.Mock).mockClear();
+    mockRouterPush = jest.fn();
+    (useRouter as jest.Mock).mockReturnValue({ push: mockRouterPush });
+    mockConsoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    mockConsoleError.mockRestore();
   });
 
   it('renders the logout button', () => {
     render(<LogoutButton />);
-    expect(screen.getByRole('button', { name: /logout/i })).toBeInTheDocument();
+    expect(screen.getByTestId('logout-button-mock')).toBeInTheDocument();
+    expect(screen.getByText('Logout')).toBeInTheDocument();
   });
 
-  it('calls supabase.auth.signOut and redirects on successful logout', async () => {
-    mockSignOut.mockResolvedValueOnce({ error: null }); // Mock successful logout
+  it('calls supabase.auth.signOut() and redirects on successful logout', async () => {
+    (supabase.auth.signOut as jest.Mock).mockResolvedValueOnce({ error: null });
 
     render(<LogoutButton />);
-    fireEvent.click(screen.getByRole('button', { name: /logout/i }));
+    fireEvent.click(screen.getByText('Logout'));
 
     await waitFor(() => {
-      expect(mockSignOut).toHaveBeenCalledTimes(1);
+      expect(supabase.auth.signOut).toHaveBeenCalledTimes(1);
     });
-    
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/auth/login');
+      expect(mockRouterPush).toHaveBeenCalledWith('/auth/login');
     });
-    expect(global.alert).not.toHaveBeenCalled();
   });
 
-  it('displays an alert if logout fails', async () => {
-    const errorMessage = 'Logout failed due to network error';
-    mockSignOut.mockResolvedValueOnce({ error: { message: errorMessage } }); // Mock failed logout
+  it('logs an error and does not redirect if signOut fails', async () => {
+    const errorMessage = 'Sign out failed';
+    (supabase.auth.signOut as jest.Mock).mockResolvedValueOnce({ error: { message: errorMessage, name: 'AuthError', status: 500 } });
 
     render(<LogoutButton />);
-    fireEvent.click(screen.getByRole('button', { name: /logout/i }));
+    fireEvent.click(screen.getByText('Logout'));
 
     await waitFor(() => {
-      expect(mockSignOut).toHaveBeenCalledTimes(1);
+      expect(supabase.auth.signOut).toHaveBeenCalledTimes(1);
     });
+    await waitFor(() => {
+      expect(mockConsoleError).toHaveBeenCalledWith('Error signing out:', { message: errorMessage, name: 'AuthError', status: 500 });
+    });
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+
+  it('handles unexpected error structure from signOut', async () => {
+    const unexpectedError = new Error('Unexpected error');
+    (supabase.auth.signOut as jest.Mock).mockRejectedValueOnce(unexpectedError);
+
+    render(<LogoutButton />);
+    fireEvent.click(screen.getByText('Logout'));
 
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith(`Logout failed: ${errorMessage}`);
+      expect(supabase.auth.signOut).toHaveBeenCalledTimes(1);
     });
-    expect(mockPush).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(mockConsoleError).toHaveBeenCalledWith('Error signing out:', unexpectedError);
+    });
+    expect(mockRouterPush).not.toHaveBeenCalled();
   });
 });

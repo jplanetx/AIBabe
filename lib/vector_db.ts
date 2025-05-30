@@ -306,13 +306,12 @@ export async function getConversationContext(
       allResults.set(msg.id, {
         id: msg.id,
         text: msg.content,
-        score: 1.0, // High score for recent messages
+        score: 1.0,
         conversationId: msg.conversationId,
         userId,
         createdAt: msg.createdAt.toISOString(),
       });
     });
-    
     // Add semantic results (they might overlap with recent messages)
     semanticResults.forEach(result => {
       if (!allResults.has(result.id)) {

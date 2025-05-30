@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Heart, Menu, X, User, MessageCircle, CreditCard, LogIn, UserPlus, LogOut } from "lucide-react";
+import { Heart, Menu, X, User, MessageCircle, CreditCard, LogIn, UserPlus } from "lucide-react"; // Removed LogOut
 import { Button } from "@/components/ui/button";
+import LogoutButton from "@/components/auth/logout-button"; // Added LogoutButton import
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 
@@ -46,23 +47,9 @@ const Navbar = () => {
       setIsLoading(false);
     }
   };
-
-  const handleLogout = async () => {
-    try {
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-      });
-      
-      if (response.ok) {
-        setIsAuthenticated(false);
-        router.push('/');
-        router.refresh();
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
+ 
+  // Removed handleLogout function as it's now handled by LogoutButton component
+ 
   const toggleMenu = () => setIsOpen(!isOpen);
   const closeMenu = () => setIsOpen(false);
 
@@ -131,14 +118,7 @@ const Navbar = () => {
               <>
                 {isAuthenticated ? (
                   <>
-                    <Button
-                      onClick={handleLogout}
-                      variant="outline"
-                      className="border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20"
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Logout
-                    </Button>
+                    <LogoutButton />
                     <Button
                       asChild
                       variant="gradient"
@@ -240,17 +220,9 @@ const Navbar = () => {
               <>
                 {isAuthenticated ? (
                   <>
-                    <Button
-                      onClick={() => {
-                        handleLogout();
-                        closeMenu();
-                      }}
-                      variant="outline"
-                      className="w-full border-pink-500 text-pink-600 hover:bg-pink-50 dark:hover:bg-pink-900/20"
-                    >
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Logout
-                    </Button>
+                    <div onClick={closeMenu} className="w-full"> {/* Ensure closeMenu is called */}
+                      <LogoutButton />
+                    </div>
                     <Button
                       asChild
                       variant="gradient"

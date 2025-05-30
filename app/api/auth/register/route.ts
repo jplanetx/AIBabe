@@ -77,8 +77,9 @@ export async function POST(request: NextRequest) {
       const newUserInDb = await db.user.create({
         data: {
           id: data.user.id, // Use the ID from Supabase Auth
-          email: data.user.email,
+          email: data.user.email!, // Assert email is present as Supabase user would have it
           name: name ?? null, // avoid undefined → runtime error
+          // Do not store password in the public.User table
         },
       });
       console.log('User record created in public schema:', newUserInDb);

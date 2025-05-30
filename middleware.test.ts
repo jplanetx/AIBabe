@@ -1,6 +1,10 @@
 /**
  * @jest-environment node
  */
+// Define Supabase env vars for test environment
+process.env.NEXT_PUBLIC_SUPABASE_URL = 'http://localhost:54321';
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key';
+
 import { middleware } from './middleware';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
