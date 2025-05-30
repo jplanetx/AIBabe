@@ -4,13 +4,17 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../node_modules/.prisma/client"
+  relationMode = "prisma"
 }
 
 // Load environment variables
 // @ts-ignore
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")   // Your application's URL (6543)
+  directUrl = env("DIRECT_URL")   // Prisma CLI's URL (5432)
+  referentialIntegrity = "prisma"
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model User {
