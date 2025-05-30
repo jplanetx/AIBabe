@@ -1,22 +1,27 @@
 // lib/pineconeClient.ts
 import { Pinecone } from '@pinecone-database/pinecone';
+import fetch from 'node-fetch';
+
+globalThis.fetch = fetch as any;
 
 let pineconeClientInstance: Pinecone | null = null;
 
 function initializePineconeClient(): Pinecone {
   const apiKey = process.env.PINECONE_API_KEY;
-  // const environment = process.env.PINECONE_ENVIRONMENT; // Environment is used in spec, not constructor
+  const environment = process.env.PINECONE_ENVIRONMENT; // Environment is used in spec, not constructor
 
   if (!apiKey) {
     throw new Error('PINECONE_API_KEY is not set in the environment variables.');
   }
-  // if (!environment) { // No longer check here, will be checked if needed for spec
-  //   throw new Error('PINECONE_ENVIRONMENT is not set in the environment variables.');
-  // }
+  if (!environment) {
+    throw new Error('PINECONE_ENVIRONMENT is not set in the environment variables.');
+  }
 
   // Pinecone constructor typically only takes apiKey or relies on env variables.
   // Environment is specified in the index spec.
-  return new Pinecone({ apiKey });
+  return new Pinecone({ 
+    apiKey,
+  });
 }
 
 export function getPineconeClient(): Pinecone {

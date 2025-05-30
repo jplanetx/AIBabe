@@ -12,8 +12,30 @@
       "description": "Identifier of the user to whom this fact or preference belongs.",
       "type": "string"
     },
-    "timestamp": {
-      "description": "ISO 8601 formatted timestamp indicating when the fact/preference was created or last updated.",
+    "factText": {
+      "description": "The original text content of the fact. Only applicable if 'type' is 'fact'.",
+      "type": "string"
+    },
+    "preferenceValue": {
+      "description": "The value of the preference. Only applicable if 'type' is 'preference'.",
+      "type": "string"
+    },
+    "preferenceType": {
+      "description": "Specific type of preference (e.g., TONE, TOPIC_AVOIDANCE, INFO_DEPTH). Only applicable if 'type' is 'preference'.",
+      "type": "string",
+      "enum": ["TONE", "TOPIC_AVOIDANCE", "INFO_DEPTH"]
+    },
+    "sourceSessionId": {
+      "description": "Optional identifier of the session where the fact or preference was learned/set.",
+      "type": "string"
+    },
+    "createdAt": {
+      "description": "ISO 8601 formatted timestamp indicating when the fact/preference was created.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "description": "ISO 8601 formatted timestamp indicating when the fact/preference was last updated.",
       "type": "string",
       "format": "date-time"
     },
@@ -21,28 +43,20 @@
       "description": "The type of semantic memory item.",
       "type": "string",
       "enum": ["fact", "preference"]
-    },
-    "text": {
-      "description": "The original text content of the fact or the value of the preference.",
-      "type": "string"
-    },
-    "preferenceType": {
-      "description": "Specific type of preference (e.g., TONE, TOPIC_AVOIDANCE). Only applicable if 'type' is 'preference'.",
-      "type": "string",
-      "enum": ["TONE", "TOPIC_AVOIDANCE", "INFO_DEPTH"]
     }
   },
   "required": [
     "vectorId",
     "userId",
-    "timestamp",
-    "type",
-    "text"
+    "type"
   ],
   "if": {
     "properties": { "type": { "const": "preference" } }
   },
   "then": {
-    "required": ["preferenceType"]
+    "required": ["preferenceType", "preferenceValue"]
+  },
+   "else": {
+    "required": ["factText"]
   }
 }
