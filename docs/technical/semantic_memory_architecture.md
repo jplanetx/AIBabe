@@ -39,10 +39,15 @@ The Semantic Memory feature will introduce the following key components:
     *   **Input:** Extracted semantic information (textual representation).
     *   **Output:** Vector embedding.
 
-3.  **Semantic Memory Storage (Vector Database):**
-    *   **Responsibility:** Stores vector embeddings of semantic information along with associated metadata.
-    *   **Technology:** Pinecone (as per existing system architecture).
-    *   **Metadata:** `userId`, `memoryId` (unique ID for the memory chunk), `timestamp`, `sourceMessageId`, `memoryType` (fact, preference), `entity`, `attribute`, `originalTextSnippet`.
+3.  **Semantic Memory Storage:** This is a hybrid approach:
+    *   **3.3.1. Vector Embeddings (Pinecone):**
+        *   **Responsibility:** Stores vector embeddings of semantic information (facts and preferences) for efficient similarity search.
+        *   **Technology:** Pinecone (as per existing system architecture in [`docs/system_architecture_chat_auth_search.md`](docs/system_architecture_chat_auth_search.md)).
+        *   **Metadata in Pinecone:** Adheres to [`docs/schemas/semantic_memory_schema.json`](docs/schemas/semantic_memory_schema.json), including `vectorId` (corresponding to Prisma record ID), `userId`, `timestamp`, `type` ('fact' or 'preference'), `text`, and preference-specific fields.
+    *   **3.3.2. Structured Metadata (Supabase PostgreSQL via Prisma):**
+        *   **Responsibility:** Stores the primary textual content, relational links, and detailed metadata for user facts and preferences.
+        *   **Technology:** Supabase PostgreSQL, accessed via Prisma ORM.
+        *   **Prisma Models:** [`UserFact`](prisma/schema.prisma:167) and [`UserSemanticPreference`](prisma/schema.prisma:182) as defined in [`prisma/schema.prisma`](prisma/schema.prisma). These models store the actual text, type, source, and user associations. The `id` of these records serves as the `vectorId` in Pinecone.
 
 4.  **Memory Ingestion Service:**
     *   **Responsibility:** Orchestrates the process of extracting, embedding, and storing new memories. This service will likely be an asynchronous background process triggered after a message is processed by the core chat service.
@@ -157,8 +162,12 @@ sequenceDiagram
 *   **5.3. Semantic Information Extractor & Contextual Augmentation:** **OpenAI GPT models** (e.g., GPT-3.5-turbo, GPT-4)
     *   **Justification:** Strong natural language understanding capabilities required to accurately identify facts, preferences, and nuances from user text. Can also handle the contextual augmentation and conflict resolution logic.
 *   **5.4. Primary Data & Metadata Storage:** **Supabase PostgreSQL** with **Prisma ORM**
-    *   **Justification:** Existing primary database. Suitable for storing structured metadata related to semantic memories (e.g., `memoryId`, `userId`, `timestamp`, `memoryType`, links to original messages) and for managing user-specific memory configurations. Prisma simplifies database interactions.
-*   **5.5. Asynchronous Processing:** (Consideration for Memory Ingestion)
+    *   **Justification:** Existing primary database. Suitable for storing structured metadata for `UserFact` and `UserSemanticPreference` (defined in [`prisma/schema.prisma`](prisma/schema.prisma:167)), including their textual content, types, user associations, and timestamps. Prisma simplifies database interactions.
+*   **5.5. Client Configuration and Initialization:**
+    *   **Prisma Client:** The existing global Prisma client instance from [`lib/prismaClient.ts`](lib/prismaClient.ts) will be used for all interactions with the Supabase PostgreSQL database, including operations on `UserFact` and `UserSemanticPreference` tables.
+    *   **Pinecone Client:** The existing Pinecone client initialization from [`lib/pineconeClient.ts`](lib/pineconeClient.ts) will be used. It will be configured to use a dedicated namespace for semantic memory vectors (see Environment Variables).
+    *   **Semantic Memory Store ([`lib/semanticMemoryStore.ts`](lib/semanticMemoryStore.ts)):** A new utility module will be created to encapsulate semantic memory-specific interactions with both Prisma and Pinecone clients. This module will handle initialization checks and provide a unified interface for semantic memory operations.
+*   **5.6. Asynchronous Processing:** (Consideration for Memory Ingestion)
     *   **Technology:** Vercel Serverless Functions (for initial implementation), potentially moving to a dedicated queue like BullMQ or a cloud-native queue (AWS SQS, Google Pub/Sub) if load increases.
     *   **Justification:** Decouples memory ingestion from the main chat response flow, ensuring chat responsiveness.
 
@@ -170,24 +179,34 @@ sequenceDiagram
 *   **6.2. User Authentication (Supabase Auth):**
     *   All memory operations (ingestion, retrieval, management) MUST be scoped to the authenticated `userId`. Pinecone queries will filter by `userId` metadata. Supabase RLS will protect memory metadata.
 *   **6.3. Primary Database (Supabase PostgreSQL & Prisma):**
-    *   A new Prisma model, `SemanticMemoryMetadata`, might be introduced:
+    *   The semantic memory feature will utilize the existing `UserFact` and `UserSemanticPreference` models defined in [`prisma/schema.prisma`](prisma/schema.prisma).
         ```prisma
-        model SemanticMemoryMetadata {
-          id        String   @id @default(cuid())
-          userId    String   // Foreign key to User.id
-          user      User     @relation(fields: [userId], references: [id])
-          pineconeVectorId String @unique // ID of the vector in Pinecone
-          memoryType String   // e.g., "fact", "preference", "correction"
-          contentSnippet String // A brief snippet of the original text
-          extractedData Json?  // Structured representation of the memory
-          sourceMessageId String? // Link to the original Message.id if applicable
-          message   Message? @relation(fields: [sourceMessageId], references: [id])
+        // From prisma/schema.prisma
+        model UserFact {
+          id        String   @id @default(cuid()) // Corresponds to fact_id and Pinecone vector ID
+          userId    String   // Foreign key to User model
+          factText  String   @db.Text // The actual text of the fact
+          sourceSessionId String?  // ID of the session where the fact was stated
           createdAt DateTime @default(now())
           updatedAt DateTime @updatedAt
-          isActive  Boolean  @default(true) // For soft deletes or deactivation
+          user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+          @@index([userId])
+        }
+
+        model UserSemanticPreference {
+          id              String                 @id @default(cuid()) // Corresponds to preference_id and Pinecone vector ID
+          userId          String                 // Foreign key to User model
+          preferenceType  SemanticPreferenceType // Type of preference (e.g., TONE, TOPIC_AVOIDANCE)
+          preferenceValue String                 // Value of the preference
+          sourceSessionId String?                // ID of the session where the preference was stated
+          createdAt       DateTime               @default(now())
+          updatedAt       DateTime               @updatedAt
+          user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+          @@unique([userId, preferenceType])
+          @@index([userId])
         }
         ```
-    *   This table will link Supabase user/message records to vectors in Pinecone.
+    *   These models store the structured metadata for facts and preferences. The `id` field of these models will serve as the `vectorId` in the Pinecone metadata schema ([`docs/schemas/semantic_memory_schema.json`](docs/schemas/semantic_memory_schema.json)), linking the structured data in PostgreSQL to the vector embeddings in Pinecone.
 *   **6.4. API Design:**
     *   Modify `/api/chat`: No new public-facing endpoints needed for basic ingestion/retrieval if integrated into the existing chat flow.
     *   New Endpoints (Memory Management):
