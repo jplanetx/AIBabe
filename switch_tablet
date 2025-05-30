@@ -1,0 +1,39 @@
+Prompt for Switching to Tablet Environment
+Next Steps for Your Tablet Setup
+Cloud-Based Docker Environment:
+
+Choose a cloud provider to host your Docker containers. Recommended options:
+Railway.app: Simple setup for Docker containers and managed PostgreSQL databases.
+Render.com: Affordable and developer-friendly platform for containerized applications.
+AWS Fargate: Serverless container hosting for scalable environments.
+Set up your PostgreSQL shadow database and update .env with the cloud connection string.
+Tablet Workflow:
+
+Access your codebase via VS Codespaces or a similar cloud IDE.
+Ensure your tablet has access to the cloud-hosted Docker environment.
+Use Prisma CLI (npx prisma migrate dev) to apply migrations and verify the database connection.
+Continue Development:
+
+Focus on implementing CRUD utilities for semantic memory management.
+Integrate semantic memory into the chat API.
+Test and refine the system using High-Level Acceptance Tests (HLTs).
+Key Files to Review
+Schemas:
+Prisma schema: prisma/schema.prisma
+JSON schema: docs/schemas/semantic_memory_schema.json
+Documentation:
+Prisma preparation: docs/technical/framework_scaffold_report_prisma_prep.md
+Semantic memory schemas: docs/technical/framework_scaffold_report_semantic_memory_schemas.md
+Semantic memory architecture: docs/technical/semantic_memory_architecture.md
+Implementation plan: docs/technical/advanced_chat_semantic_memory_implementation_plan.md
+Environment Configuration:
+.env file for database connection and API keys.
+Codebase:
+Semantic memory utilities: lib/semanticMemoryStore.ts
+Chat API: app/api/girlfriends/route.ts
+Tablet Setup Checklist
+Ensure your tablet has a stable internet connection.
+Use a cloud IDE like VS Codespaces or GitHub Codespaces for seamless development.
+Connect to the cloud-hosted Docker environment for database operations.
+Verify access to all project files and documentation.
+Let me know if you need further assistance with the setup or any specific task!
